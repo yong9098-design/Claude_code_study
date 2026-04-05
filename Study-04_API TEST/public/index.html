@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>냉장고 재료 인식 — Step 1</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f0f4f8;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      color: #1a202c;
+    }
+
+    /* ── 스크린리더 전용 ── */
+    .sr-only {
+      position: absolute; width: 1px; height: 1px;
+      padding: 0; margin: -1px; overflow: hidden;
+      clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+    }
+
+    /* ── 스테퍼 ── */
+    .stepper {
+      width: 100%;
+      background: #fff;
+      border-bottom: 1px solid #e5e7eb;
+      padding: 14px 24px;
+    }
+    .stepper-list {
+      list-style: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+    .stepper-item {
+      display: flex; flex-direction: column;
+      align-items: center; gap: 6px; flex-shrink: 0;
+    }
+    .stepper-circle {
+      width: 32px; height: 32px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700;
+      background: #e5e7eb; color: #9ca3af;
+      transition: background 0.2s, color 0.2s;
+    }
+    .stepper-label { font-size: 11px; font-weight: 600; color: #9ca3af; white-space: nowrap; }
+    .stepper-item.completed .stepper-circle { background: #059669; color: #fff; }
+    .stepper-item.completed .stepper-label { color: #059669; }
+    .stepper-item.current .stepper-circle {
+      background: #4f46e5; color: #fff;
+      box-shadow: 0 0 0 4px #eef2ff;
+    }
+    .stepper-item.current .stepper-label { color: #4f46e5; font-weight: 700; }
+    .stepper-connector {
+      flex: 1; height: 2px; background: #e5e7eb;
+      margin: 0 6px; margin-bottom: 18px;
+    }
+
+    /* ── 본문 ── */
+    .page-wrap {
+      width: 100%; max-width: 640px;
+      padding: 40px 16px 60px;
+      display: flex; flex-direction: column; gap: 20px;
+    }
+
+    header { text-align: center; }
+    header h1 { font-size: 26px; font-weight: 800; color: #1e1b4b; }
+    header p  { color: #6b7280; margin-top: 6px; font-size: 15px; }
+
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      padding: 28px;
+    }
+
+    /* ── 드롭존 ── */
+    #drop-zone {
+      border: 2.5px dashed #c7d2fe;
+      border-radius: 12px;
+      padding: 48px 24px;
+      text-align: center;
+      cursor: pointer;
+      background: #fafafa;
+      outline: none;
+      transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+    }
+    #drop-zone:focus-visible {
+      box-shadow: 0 0 0 3px #4f46e5;
+      border-color: #4f46e5;
+    }
+    #drop-zone.dragover {
+      border-color: #4f46e5;
+      background: #eef2ff;
+      box-shadow: inset 0 0 0 3px #c7d2fe;
+    }
+    #drop-zone.has-image { padding: 0; border: none; background: transparent; }
+    #drop-zone .drop-icon { font-size: 48px; margin-bottom: 12px; }
+    #drop-zone p { color: #6b7280; font-size: 14px; }
+    #drop-zone strong { color: #4f46e5; }
+
+    #preview-img {
+      width: 100%; max-height: 320px;
+      object-fit: cover; border-radius: 12px;
+      display: none; border: 1px solid #e5e7eb;
+    }
+    #drop-zone.has-image #preview-img { display: block; }
+
+    /* 카메라 버튼 (모바일 전용) */
+    .camera-btn { display: none; }
+    @media (max-width: 600px) {
+      .camera-btn { display: flex; }
+    }
+
+    /* ── 버튼 공통 ── */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      border: none; border-radius: 10px; cursor: pointer;
+      font-size: 15px; font-weight: 700;
+      padding: 0 20px; min-height: 44px;
+      transition: background 0.2s, opacity 0.2s;
+    }
+    .btn:focus-visible { box-shadow: 0 0 0 3px #c7d2fe; outline: none; }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-primary { background: #4f46e5; color: #fff; width: 100%; margin-top: 16px; }
+    .btn-primary:not(:disabled):hover { background: #4338ca; }
+    .btn-green   { background: #059669; color: #fff; width: 100%; margin-top: 8px; }
+    .btn-green:hover { background: #047857; }
+    .btn-outline {
+      background: #e0e7ff; color: #4338ca;
+      padding: 0 16px; font-size: 14px; margin-top: 12px;
+    }
+    .btn-outline:hover { background: #c7d2fe; }
+    .btn-add {
+      background: #e0e7ff; color: #4338ca;
+      padding: 0 16px; font-size: 14px; min-height: 44px;
+    }
+    .btn-add:hover { background: #c7d2fe; }
+
+    .spinner {
+      width: 18px; height: 18px;
+      border: 3px solid rgba(255,255,255,0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── 에러 ── */
+    #error-msg {
+      margin-top: 12px;
+      padding: 12px 16px;
+      background: #fef2f2; border: 1px solid #fca5a5;
+      border-radius: 8px; color: #b91c1c; font-size: 14px;
+    }
+
+    /* ── 결과 영역 ── */
+    #result-section h2 {
+      font-size: 16px; font-weight: 700;
+      margin-bottom: 14px; color: #374151;
+    }
+
+    /* ── 태그 ── */
+    #tag-list {
+      display: flex; flex-wrap: wrap; gap: 8px;
+      margin-bottom: 16px; min-height: 32px;
+    }
+    .tag {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: #eef2ff; color: #4338ca;
+      border: 1px solid #c7d2fe;
+      border-radius: 999px; padding: 5px 12px;
+      font-size: 14px; font-weight: 500;
+    }
+    .tag-del {
+      background: none; border: none;
+      color: #a5b4fc; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      padding: 2px; border-radius: 50%;
+      transition: color 0.15s;
+      min-width: 20px; min-height: 20px;
+    }
+    .tag-del:hover { color: #ef4444; }
+    .tag-del:focus-visible { outline: 2px solid #4f46e5; }
+
+    .empty-note { color: #6b7280; font-size: 13px; font-style: italic; }
+
+    /* ── 재료 추가 ── */
+    .add-row { display: flex; gap: 8px; }
+    .add-row input {
+      flex: 1; padding: 0 14px; min-height: 44px;
+      border: 1.5px solid #d1d5db; border-radius: 8px;
+      font-size: 14px; outline: none;
+      transition: border-color 0.2s;
+    }
+    .add-row input:focus { border-color: #4f46e5; }
+
+    /* ── 토스트 ── */
+    #toast-container {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      z-index: 200; display: flex; flex-direction: column; gap: 8px;
+      min-width: 280px; max-width: 360px; width: calc(100% - 32px);
+    }
+    .toast {
+      border-radius: 10px; padding: 12px 16px;
+      font-size: 14px; font-weight: 500; line-height: 1.5;
+      display: flex; align-items: flex-start; gap: 10px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+      animation: slideUp 0.2s ease;
+    }
+    @keyframes slideUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+    .toast-error   { background: #fef2f2; border: 1px solid #fca5a5; color: #b91c1c; }
+    .toast-success { background: #d1fae5; border: 1px solid #6ee7b7; color: #065f46; }
+    .toast-info    { background: #eef2ff; border: 1px solid #c7d2fe; color: #3730a3; }
+    .toast-icon  { font-weight: 700; flex-shrink: 0; }
+    .toast-close {
+      margin-left: auto; background: none; border: none;
+      cursor: pointer; font-size: 18px; line-height: 1;
+      padding: 0; opacity: 0.6; flex-shrink: 0;
+    }
+
+    /* ── 반응형 ── */
+    @media (max-width: 480px) {
+      .page-wrap { padding: 24px 12px 60px; }
+      header h1 { font-size: 22px; }
+      .card { padding: 20px; }
+      #drop-zone { padding: 36px 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- 스테퍼 -->
+<nav class="stepper" aria-label="진행 단계">
+  <ol class="stepper-list">
+    <li class="stepper-item current" aria-current="step" aria-label="1단계 재료 인식, 현재 단계">
+      <span class="stepper-circle" aria-hidden="true">1</span>
+      <span class="stepper-label">재료 인식</span>
+    </li>
+    <li class="stepper-connector" aria-hidden="true"></li>
+    <li class="stepper-item" aria-label="2단계 레시피 생성, 미완료">
+      <span class="stepper-circle" aria-hidden="true">2</span>
+      <span class="stepper-label">레시피 생성</span>
+    </li>
+    <li class="stepper-connector" aria-hidden="true"></li>
+    <li class="stepper-item" aria-label="3단계 내 레시피, 미완료">
+      <span class="stepper-circle" aria-hidden="true">3</span>
+      <span class="stepper-label">내 레시피</span>
+    </li>
+  </ol>
+</nav>
+
+<div class="page-wrap">
+  <header>
+    <h1>냉장고 재료 인식</h1>
+    <p>냉장고 사진을 업로드하면 AI가 식재료를 자동으로 인식합니다.</p>
+  </header>
+
+  <div class="card">
+    <!-- 드롭존 -->
+    <div id="drop-zone"
+         role="button"
+         tabindex="0"
+         aria-label="냉장고 사진 업로드. 클릭하거나 Enter 키를 누르세요. JPG, PNG, WEBP 파일, 최대 10MB">
+      <div id="drop-content">
+        <div class="drop-icon" aria-hidden="true">🧊</div>
+        <p><strong>클릭하거나 사진을 드래그</strong>하여 업로드</p>
+        <p style="margin-top:6px;font-size:13px;">JPG · PNG · WEBP · 최대 10MB</p>
+      </div>
+      <img id="preview-img" alt="업로드한 냉장고 사진 미리보기" />
+    </div>
+
+    <!-- 파일 입력 (숨김) -->
+    <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp"
+           aria-hidden="true" tabindex="-1" />
+    <input type="file" id="camera-input" accept="image/*"
+           capture="environment" aria-hidden="true" tabindex="-1" />
+
+    <!-- 모바일 카메라 버튼 -->
+    <button type="button" id="camera-btn" class="btn btn-outline camera-btn">
+      📸 카메라로 촬영
+    </button>
+
+    <!-- 에러 메시지 -->
+    <div id="error-msg" role="alert" aria-live="assertive" hidden></div>
+
+    <!-- 스크린리더 알림 -->
+    <div id="sr-announce" role="status" aria-live="polite" aria-atomic="true" class="sr-only"></div>
+
+    <!-- 분석 버튼 -->
+    <button type="button" id="analyze-btn" class="btn btn-primary" disabled aria-disabled="true">
+      재료 인식하기
+    </button>
+  </div>
+
+  <!-- 결과 영역 -->
+  <div class="card" id="result-section" hidden>
+    <h2>인식된 재료 <span id="count-badge" style="font-weight:400;color:#6b7280;font-size:13px;"></span></h2>
+    <div id="tag-list" role="list" aria-label="인식된 재료 목록"></div>
+
+    <div class="add-row">
+      <label for="add-input" class="sr-only">재료 이름 입력</label>
+      <input type="text" id="add-input"
+             placeholder="재료 직접 추가..."
+             aria-label="재료 이름 입력 후 추가 버튼 또는 Enter" />
+      <button type="button" id="add-btn" class="btn btn-add">+ 추가</button>
+    </div>
+
+    <button type="button" id="next-btn" class="btn btn-green">
+      레시피 생성하기 →
+    </button>
+  </div>
+</div>
+
+<!-- 토스트 컨테이너 -->
+<div id="toast-container" aria-live="assertive" aria-atomic="true"></div>
+
+<script>
+  // ── 토스트 ──────────────────────────────────────────────────
+  function showToast(message, type = 'error', duration = 4000) {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    const icons = { error: '!', success: '✓', info: 'i' };
+    toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
+    toast.className = `toast toast-${type}`;
+    toast.innerHTML = `
+      <span class="toast-icon" aria-hidden="true">${icons[type] || '!'}</span>
+      <span>${message}</span>
+      <button onclick="this.parentElement.remove()" aria-label="알림 닫기" class="toast-close" style="color:inherit">×</button>`;
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), duration);
+  }
+
+  // ── 요소 참조 ────────────────────────────────────────────────
+  const dropZone     = document.getElementById('drop-zone');
+  const dropContent  = document.getElementById('drop-content');
+  const fileInput    = document.getElementById('file-input');
+  const cameraInput  = document.getElementById('camera-input');
+  const cameraBtn    = document.getElementById('camera-btn');
+  const previewImg   = document.getElementById('preview-img');
+  const analyzeBtn   = document.getElementById('analyze-btn');
+  const errorMsg     = document.getElementById('error-msg');
+  const srAnnounce   = document.getElementById('sr-announce');
+  const resultSection = document.getElementById('result-section');
+  const tagList      = document.getElementById('tag-list');
+  const addInput     = document.getElementById('add-input');
+  const addBtn       = document.getElementById('add-btn');
+  const nextBtn      = document.getElementById('next-btn');
+  const countBadge   = document.getElementById('count-badge');
+
+  let currentFile = null;
+  let ingredients = [];
+
+  // ── 드롭존 이벤트 ────────────────────────────────────────────
+  dropZone.addEventListener('click', () => fileInput.click());
+  dropZone.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
+  });
+  dropZone.addEventListener('dragover', e => {
+    e.preventDefault();
+    dropZone.classList.add('dragover');
+    dropZone.setAttribute('aria-label', '파일을 여기에 놓으세요!');
+  });
+  dropZone.addEventListener('dragleave', () => {
+    dropZone.classList.remove('dragover');
+    dropZone.setAttribute('aria-label', '냉장고 사진 업로드. 클릭하거나 Enter 키를 누르세요.');
+  });
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    dropZone.setAttribute('aria-label', '냉장고 사진 업로드. 클릭하거나 Enter 키를 누르세요.');
+    handleFile(e.dataTransfer.files[0]);
+  });
+
+  fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
+  cameraInput.addEventListener('change', e => handleFile(e.target.files[0]));
+  cameraBtn.addEventListener('click', () => cameraInput.click());
+
+  // ── 파일 처리 ────────────────────────────────────────────────
+  function handleFile(file) {
+    if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      showFileError('이 파일은 지원하지 않아요. JPG, PNG, WEBP 이미지를 사용해주세요.');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      showFileError('사진 파일이 너무 커요 (최대 10MB). 사진 앱에서 크기를 줄인 후 다시 시도해주세요.');
+      return;
+    }
+    currentFile = file;
+    hideError();
+    resultSection.hidden = true;
+    ingredients = [];
+
+    const reader = new FileReader();
+    reader.onload = e => {
+      previewImg.src = e.target.result;
+      previewImg.hidden = false;
+      dropContent.hidden = true;
+      dropZone.classList.add('has-image');
+      analyzeBtn.disabled = false;
+      analyzeBtn.removeAttribute('aria-disabled');
+      srAnnounce.textContent = '사진이 선택됐습니다. 재료 인식하기 버튼을 눌러 분석을 시작하세요.';
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function showFileError(msg) {
+    errorMsg.textContent = msg;
+    errorMsg.hidden = false;
+  }
+  function hideError() {
+    errorMsg.hidden = true;
+    errorMsg.textContent = '';
+  }
+
+  // ── 재료 분석 ────────────────────────────────────────────────
+  analyzeBtn.addEventListener('click', async () => {
+    if (!currentFile) return;
+    setLoading(true);
+    hideError();
+
+    try {
+      const base64 = await fileToBase64(currentFile);
+      const res = await fetch('/api/analyze-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64, mimeType: currentFile.type }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '분석에 실패했습니다.');
+
+      ingredients = data.ingredients || [];
+      renderTags();
+      resultSection.hidden = false;
+      resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } catch (err) {
+      showFileError(err.message);
+      srAnnounce.textContent = '재료 분석에 실패했습니다.';
+    } finally {
+      setLoading(false);
+    }
+  });
+
+  function setLoading(on) {
+    if (on) {
+      analyzeBtn.disabled = true;
+      analyzeBtn.setAttribute('aria-busy', 'true');
+      analyzeBtn.innerHTML = '<div class="spinner" aria-hidden="true"></div> AI 분석 중...';
+      srAnnounce.textContent = 'AI가 냉장고 사진을 분석하고 있습니다. 잠시 기다려주세요.';
+    } else {
+      analyzeBtn.disabled = false;
+      analyzeBtn.removeAttribute('aria-disabled');
+      analyzeBtn.removeAttribute('aria-busy');
+      analyzeBtn.textContent = '재료 인식하기';
+    }
+  }
+
+  // ── 태그 렌더링 ──────────────────────────────────────────────
+  function renderTags() {
+    tagList.innerHTML = '';
+    if (ingredients.length === 0) {
+      const note = document.createElement('span');
+      note.className = 'empty-note';
+      note.textContent = '인식된 재료가 없습니다. 직접 추가해주세요.';
+      tagList.appendChild(note);
+      countBadge.textContent = '';
+    } else {
+      countBadge.textContent = `(${ingredients.length}개)`;
+      ingredients.forEach((ing, i) => {
+        const li = document.createElement('li');
+        li.setAttribute('role', 'listitem');
+        li.className = 'tag';
+        li.innerHTML = `
+          <span>${ing}</span>
+          <button type="button" class="tag-del" aria-label="${ing} 삭제" data-i="${i}">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+          </button>`;
+        tagList.appendChild(li);
+      });
+    }
+    // 스크린리더 알림
+    const msg = ingredients.length === 0
+      ? '재료를 인식하지 못했습니다. 직접 추가해주세요.'
+      : `${ingredients.length}개의 재료를 인식했습니다. 목록을 확인하고 수정하세요.`;
+    srAnnounce.textContent = msg;
+  }
+
+  // 태그 삭제 (이벤트 위임)
+  tagList.addEventListener('click', e => {
+    const btn = e.target.closest('.tag-del');
+    if (!btn) return;
+    const i = parseInt(btn.dataset.i, 10);
+    const removed = ingredients[i];
+    ingredients.splice(i, 1);
+    renderTags();
+    srAnnounce.textContent = `${removed} 재료가 삭제됐습니다.`;
+  });
+
+  // ── 재료 추가 ────────────────────────────────────────────────
+  function addIngredient() {
+    const val = addInput.value.trim();
+    if (!val) return;
+    if (ingredients.includes(val)) {
+      showToast('이미 목록에 있는 재료예요.', 'info');
+      return;
+    }
+    ingredients.push(val);
+    addInput.value = '';
+    renderTags();
+    resultSection.hidden = false;
+    addInput.focus();
+  }
+  addBtn.addEventListener('click', addIngredient);
+  addInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addIngredient(); } });
+
+  // ── 다음 단계 ────────────────────────────────────────────────
+  nextBtn.addEventListener('click', () => {
+    if (ingredients.length === 0) {
+      showToast('레시피를 만들려면 재료가 1개 이상 필요해요. 재료를 추가해주세요.', 'error');
+      return;
+    }
+    const params = new URLSearchParams({ ingredients: JSON.stringify(ingredients) });
+    window.location.href = `/step2.html?${params}`;
+  });
+
+  // ── 유틸 ─────────────────────────────────────────────────────
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = e => resolve(e.target.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+</script>
+</body>
+</html>

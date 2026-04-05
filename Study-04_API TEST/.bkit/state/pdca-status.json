@@ -1,0 +1,57 @@
+{
+  "version": "3.0",
+  "lastUpdated": "2026-03-26T13:55:47.624Z",
+  "activeFeatures": [
+    "Study-04"
+  ],
+  "primaryFeature": "Study-04",
+  "features": {
+    "Study-04": {
+      "phase": "do",
+      "phaseNumber": 3,
+      "matchRate": null,
+      "iterationCount": 0,
+      "requirements": [],
+      "documents": {},
+      "timestamps": {
+        "started": "2026-03-26T13:55:47.624Z",
+        "lastUpdated": "2026-03-26T13:55:47.624Z"
+      },
+      "lastFile": "c:\\Users\\hylee\\Vibe_Coding\\Study-04\\server.js"
+    }
+  },
+  "pipeline": {
+    "currentPhase": 1,
+    "level": "Dynamic",
+    "phaseHistory": []
+  },
+  "session": {
+    "startedAt": "2026-03-26T13:02:29.757Z",
+    "onboardingCompleted": false,
+    "lastActivity": "2026-03-26T13:55:47.624Z"
+  },
+  "history": [
+    {
+      "timestamp": "2026-03-26T13:55:47.624Z",
+      "feature": "Study-04",
+      "phase": "do",
+      "action": "updated"
+    }
+  ],
+  "stateMachine": {
+    "defaultWorkflow": "default",
+    "activeWorkflows": {},
+    "totalTransitions": 0
+  },
+  "automation": {
+    "globalLevel": 2,
+    "trustScore": 40,
+    "pendingApprovals": 0,
+    "lastGateResult": null
+  },
+  "team": {
+    "enabled": true,
+    "stateFile": ".bkit/runtime/agent-state.json",
+    "eventsFile": ".bkit/runtime/agent-events.jsonl"
+  }
+}

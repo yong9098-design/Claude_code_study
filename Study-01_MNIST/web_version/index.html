@@ -1,0 +1,44 @@
+<!-- Created: 2026-03-11 14:00 -->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MNIST 손글씨 인식</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>✍️ MNIST 손글씨 인식</h1>
+
+    <!-- 학습 섹션 -->
+    <div class="card" id="train-section">
+      <h2>1단계 · 모델 학습</h2>
+      <p class="desc">MNIST 데이터셋으로 CNN 모델을 학습합니다.</p>
+      <button id="train-btn" class="btn primary">모델 학습 시작</button>
+      <div id="status" class="status">학습 버튼을 눌러 시작하세요.</div>
+      <div class="progress-wrap">
+        <div id="progress-bar" class="progress-bar"></div>
+      </div>
+      <div id="metrics" class="metrics"></div>
+    </div>
+
+    <!-- 그리기 섹션 -->
+    <div class="card" id="draw-section">
+      <h2>2단계 · 숫자 그리기</h2>
+      <p class="desc">검은 캔버스에 흰색으로 숫자(0~9)를 그린 후 인식 버튼을 누르세요.</p>
+      <div class="canvas-wrap">
+        <canvas id="canvas" width="280" height="280"></canvas>
+      </div>
+      <div class="btn-row">
+        <button id="clear-btn" class="btn secondary">지우기</button>
+        <button id="predict-btn" class="btn primary">인식하기</button>
+      </div>
+      <div id="result"></div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

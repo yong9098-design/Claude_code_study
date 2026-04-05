@@ -1,0 +1,1 @@
+- [User Profile](user_profile.md) — Korean fridge ingredient app, 3-step vanilla HTML/JS, OpenRouter API, ingredients passed via URL params, profileId in localStorage

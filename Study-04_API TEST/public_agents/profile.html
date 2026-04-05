@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>내 프로필 — Step 3</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f0f4f8; min-height: 100vh; color: #1a202c;
+    }
+
+    .sr-only {
+      position: absolute; width: 1px; height: 1px;
+      padding: 0; margin: -1px; overflow: hidden;
+      clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+    }
+
+    /* ── 스테퍼 ── */
+    .stepper { background: #fff; border-bottom: 1px solid #e5e7eb; padding: 14px 24px; }
+    .stepper-list {
+      list-style: none; display: flex; align-items: center;
+      justify-content: center; max-width: 480px; margin: 0 auto;
+    }
+    .stepper-item { display: flex; flex-direction: column; align-items: center; gap: 6px; flex-shrink: 0; }
+    .stepper-circle {
+      width: 32px; height: 32px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700; background: #e5e7eb; color: #9ca3af;
+    }
+    .stepper-label { font-size: 11px; font-weight: 600; color: #9ca3af; white-space: nowrap; }
+    .stepper-item.completed .stepper-circle { background: #059669; color: #fff; }
+    .stepper-item.completed .stepper-label  { color: #059669; }
+    .stepper-item.current .stepper-circle   { background: #4f46e5; color: #fff; box-shadow: 0 0 0 4px #eef2ff; }
+    .stepper-item.current .stepper-label    { color: #4f46e5; font-weight: 700; }
+    .stepper-connector { flex: 1; height: 2px; background: #e5e7eb; margin: 0 6px; margin-bottom: 18px; }
+    .stepper-item.completed + .stepper-connector { background: #059669; }
+
+    /* ── 버튼 ── */
+    .btn {
+      border: none; border-radius: 8px; cursor: pointer;
+      font-size: 14px; font-weight: 600; padding: 0 16px; min-height: 44px;
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      transition: opacity 0.2s, background 0.2s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn:focus-visible { box-shadow: 0 0 0 3px #c7d2fe; outline: none; }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-primary { background: #4f46e5; color: #fff; }
+    .btn-green   { background: #059669; color: #fff; }
+    .btn-gray    { background: #e5e7eb; color: #374151; }
+    .btn-danger  { background: none; color: #dc2626; border: 1.5px solid #fca5a5; }
+    .btn-danger:hover { background: #fef2f2; }
+    .btn-sm { font-size: 13px; padding: 0 12px; min-height: 36px; }
+
+    /* ── 프로필 생성 화면 ── */
+    #setup-screen {
+      display: flex; align-items: center; justify-content: center;
+      min-height: calc(100vh - 60px); padding: 24px;
+    }
+    .setup-card {
+      background: #fff; border-radius: 20px;
+      box-shadow: 0 4px 32px rgba(0,0,0,0.10);
+      padding: 40px 36px; width: 100%; max-width: 420px; text-align: center;
+    }
+    .setup-card h1 { font-size: 26px; color: #1e1b4b; margin-bottom: 6px; }
+    .setup-card p  { color: #6b7280; font-size: 14px; margin-bottom: 28px; }
+
+    .avatar-grid {
+      display: flex; flex-wrap: wrap; gap: 10px;
+      justify-content: center; margin-bottom: 24px;
+    }
+    .avatar-opt {
+      font-size: 28px; width: 52px; height: 52px;
+      border-radius: 50%; border: 2.5px solid #e5e7eb;
+      background: #f9fafb; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .avatar-opt:focus-visible { box-shadow: 0 0 0 3px #c7d2fe; outline: none; }
+    .avatar-opt.selected { border-color: #4f46e5; background: #eef2ff; }
+
+    .setup-input {
+      width: 100%; padding: 11px 14px; min-height: 48px;
+      border: 1.5px solid #d1d5db; border-radius: 10px;
+      font-size: 15px; outline: none; margin-bottom: 8px;
+      transition: border-color 0.2s;
+    }
+    .setup-input:focus { border-color: #4f46e5; }
+    #create-btn { width: 100%; min-height: 48px; font-size: 16px; border-radius: 10px; margin-top: 8px; }
+    #setup-error { color: #b91c1c; font-size: 13px; margin-bottom: 8px; min-height: 20px; }
+
+    /* ── 메인 화면 ── */
+    #main-screen { display: none; }
+
+    nav.main-nav {
+      background: #fff; border-bottom: 1px solid #e5e7eb;
+      padding: 14px 24px; display: flex;
+      align-items: center; justify-content: space-between;
+    }
+    .nav-logo { font-size: 18px; font-weight: 800; color: #1e1b4b; }
+    .nav-links { display: flex; gap: 12px; align-items: center; }
+    .nav-links a {
+      color: #6b7280; text-decoration: none; font-size: 14px;
+      transition: color 0.15s; padding: 4px 0;
+    }
+    .nav-links a:hover { color: #4f46e5; }
+    .nav-links a.active { color: #4f46e5; font-weight: 700; }
+
+    /* 프로필 헤더 */
+    .profile-header {
+      background: linear-gradient(135deg, #4f46e5, #7c3aed);
+      color: #fff; padding: 36px 32px;
+      display: flex; align-items: center; gap: 24px; flex-wrap: wrap;
+    }
+    .avatar-display {
+      font-size: 56px; width: 80px; height: 80px;
+      background: rgba(255,255,255,0.15); border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .profile-info { flex: 1; min-width: 0; }
+    .profile-info h2 { font-size: 24px; font-weight: 800; }
+    .profile-info .meta { font-size: 14px; opacity: 0.8; margin-top: 4px; }
+    .profile-actions { display: flex; gap: 8px; margin-left: auto; }
+
+    #edit-row {
+      display: none; flex-direction: row;
+      background: rgba(255,255,255,0.15);
+      border-radius: 10px; padding: 12px 16px;
+      gap: 8px; align-items: center; margin-top: 12px;
+      flex-wrap: wrap;
+    }
+    #edit-nickname {
+      flex: 1; background: rgba(255,255,255,0.2);
+      border: 1px solid rgba(255,255,255,0.4); border-radius: 6px;
+      color: #fff; padding: 8px 12px; font-size: 15px; outline: none;
+      min-height: 44px; min-width: 160px;
+    }
+    #edit-nickname::placeholder { color: rgba(255,255,255,0.6); }
+
+    /* 레시피 목록 */
+    .content { max-width: 960px; margin: 32px auto; padding: 0 24px 60px; }
+    .section-title {
+      font-size: 18px; font-weight: 700; color: #1e1b4b;
+      margin-bottom: 20px; display: flex; align-items: center; gap: 10px;
+    }
+    .count-chip {
+      background: #eef2ff; color: #4338ca;
+      font-size: 13px; padding: 2px 10px; border-radius: 999px;
+    }
+
+    .recipe-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 20px;
+    }
+    .recipe-card {
+      background: #fff; border-radius: 14px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+      padding: 22px; display: flex; flex-direction: column; gap: 8px;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .recipe-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.11); }
+
+    .card-badge {
+      display: inline-block; font-size: 12px; font-weight: 600;
+      padding: 3px 10px; border-radius: 999px; align-self: flex-start;
+    }
+    .badge-easy   { background: #d1fae5; color: #065f46; }
+    .badge-medium { background: #fef3c7; color: #92400e; }
+    .badge-hard   { background: #fee2e2; color: #991b1b; }
+
+    .card-name    { font-size: 17px; font-weight: 700; color: #1e1b4b; }
+    .card-summary { font-size: 13px; color: #6b7280; line-height: 1.5; }
+    .card-meta    { font-size: 12px; color: #6b7280; display: flex; gap: 12px; }
+    .card-actions { display: flex; gap: 8px; margin-top: auto; flex-wrap: wrap; }
+    .card-actions .btn { flex: 1; }
+
+    /* 빈 상태 */
+    .empty-state { text-align: center; padding: 60px 24px; color: #6b7280; grid-column: 1 / -1; }
+    .empty-state .icon { font-size: 56px; margin-bottom: 14px; }
+    .empty-state p { font-size: 15px; margin-bottom: 20px; }
+
+    /* ── 레시피 모달 ── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.45); z-index: 100;
+      align-items: center; justify-content: center; padding: 20px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: #fff; border-radius: 16px;
+      width: 100%; max-width: 560px; max-height: 85vh; overflow-y: auto; padding: 32px;
+    }
+    .modal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+    .modal-header h2 { font-size: 22px; font-weight: 800; color: #1e1b4b; }
+    .modal-close {
+      background: none; border: none; cursor: pointer; color: #9ca3af;
+      min-width: 44px; min-height: 44px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 8px; transition: color 0.15s;
+    }
+    .modal-close:hover { color: #1a202c; }
+    .modal-close:focus-visible { box-shadow: 0 0 0 3px #c7d2fe; outline: none; }
+    .modal-meta { display: flex; gap: 12px; margin-bottom: 18px; font-size: 13px; color: #6b7280; align-items: center; }
+    .section-label {
+      font-size: 13px; font-weight: 700; color: #374151;
+      margin: 18px 0 8px; text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .ing-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
+    .ing-chip {
+      background: #f3f4f6; border: 1px solid #e5e7eb;
+      border-radius: 6px; padding: 4px 10px; font-size: 13px; color: #374151;
+    }
+    .step-list { list-style: none; }
+    .step-list li { display: flex; gap: 12px; margin-bottom: 10px; font-size: 14px; color: #374151; }
+    .step-num {
+      width: 24px; height: 24px; background: #eef2ff; color: #4338ca;
+      border-radius: 50%; font-size: 12px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .tip-box {
+      background: #fffbeb; border: 1px solid #fde68a;
+      border-radius: 8px; padding: 12px 14px; font-size: 13px; color: #92400e; margin-top: 14px;
+    }
+    .modal-footer { display: flex; gap: 8px; margin-top: 24px; flex-wrap: wrap; }
+    .modal-footer .btn { flex: 1; }
+
+    /* ── 삭제 확인 다이얼로그 ── */
+    #confirm-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5); z-index: 200;
+      align-items: center; justify-content: center; padding: 24px;
+    }
+    #confirm-overlay.open { display: flex; }
+    .confirm-box {
+      background: #fff; border-radius: 14px; padding: 28px;
+      max-width: 360px; width: 100%; text-align: center;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+    }
+    .confirm-box .icon { font-size: 40px; margin-bottom: 12px; }
+    .confirm-box h3 { font-size: 18px; font-weight: 700; color: #1e1b4b; margin-bottom: 8px; }
+    .confirm-box p  { font-size: 14px; color: #6b7280; margin-bottom: 24px; }
+    /* 취소(안전) 먼저, 삭제(위험) 나중 */
+    .confirm-actions { display: flex; gap: 10px; }
+    .confirm-actions .btn { flex: 1; }
+
+    /* ── 토스트 ── */
+    #toast-container {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      z-index: 300; display: flex; flex-direction: column; gap: 8px;
+      min-width: 280px; max-width: 360px; width: calc(100% - 32px);
+    }
+    .toast {
+      border-radius: 10px; padding: 12px 16px;
+      font-size: 14px; font-weight: 500; line-height: 1.5;
+      display: flex; align-items: flex-start; gap: 10px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.12); animation: slideUp 0.2s ease;
+    }
+    @keyframes slideUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+    .toast-error   { background: #fef2f2; border: 1px solid #fca5a5; color: #b91c1c; }
+    .toast-success { background: #d1fae5; border: 1px solid #6ee7b7; color: #065f46; }
+    .toast-info    { background: #eef2ff; border: 1px solid #c7d2fe; color: #3730a3; }
+    .toast-icon  { font-weight: 700; flex-shrink: 0; }
+    .toast-close { margin-left: auto; background: none; border: none; cursor: pointer; font-size: 18px; line-height: 1; padding: 0; opacity: 0.6; flex-shrink: 0; }
+
+    /* ── 반응형 ── */
+    @media (max-width: 600px) {
+      .profile-header { padding: 24px 16px; }
+      .content { padding: 0 12px 60px; }
+      .recipe-grid { grid-template-columns: 1fr; }
+      .card-actions { flex-direction: column; }
+      .card-actions .btn { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- 스테퍼 -->
+<nav class="stepper" aria-label="진행 단계">
+  <ol class="stepper-list">
+    <li class="stepper-item completed" aria-label="1단계 재료 인식, 완료">
+      <span class="stepper-circle" aria-hidden="true">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+          <path d="M3 8l3.5 3.5L13 4.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+      <span class="stepper-label">재료 인식</span>
+    </li>
+    <li class="stepper-connector" aria-hidden="true"></li>
+    <li class="stepper-item completed" aria-label="2단계 레시피 생성, 완료">
+      <span class="stepper-circle" aria-hidden="true">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+          <path d="M3 8l3.5 3.5L13 4.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+      <span class="stepper-label">레시피 생성</span>
+    </li>
+    <li class="stepper-connector" aria-hidden="true"></li>
+    <li class="stepper-item current" aria-current="step" aria-label="3단계 내 레시피, 현재 단계">
+      <span class="stepper-circle" aria-hidden="true">3</span>
+      <span class="stepper-label">내 레시피</span>
+    </li>
+  </ol>
+</nav>
+
+<!-- ── 프로필 생성 화면 ── -->
+<div id="setup-screen">
+  <div class="setup-card">
+    <div style="font-size:48px;margin-bottom:12px;" aria-hidden="true">👨‍🍳</div>
+    <h1>프로필 만들기</h1>
+    <p>닉네임과 아바타를 선택하고<br>나만의 레시피북을 시작하세요.</p>
+
+    <div class="avatar-grid" id="avatar-grid" role="group" aria-label="아바타 선택">
+      <button type="button" class="avatar-opt selected" data-emoji="🍳" aria-label="프라이팬 아바타 선택됨" aria-pressed="true">🍳</button>
+      <button type="button" class="avatar-opt" data-emoji="🥘" aria-label="냄비 아바타" aria-pressed="false">🥘</button>
+      <button type="button" class="avatar-opt" data-emoji="🍜" aria-label="라면 아바타" aria-pressed="false">🍜</button>
+      <button type="button" class="avatar-opt" data-emoji="🥗" aria-label="샐러드 아바타" aria-pressed="false">🥗</button>
+      <button type="button" class="avatar-opt" data-emoji="🍱" aria-label="도시락 아바타" aria-pressed="false">🍱</button>
+      <button type="button" class="avatar-opt" data-emoji="🧑‍🍳" aria-label="요리사 아바타" aria-pressed="false">🧑‍🍳</button>
+    </div>
+
+    <label for="nickname-input" class="sr-only">닉네임</label>
+    <input type="text" id="nickname-input" class="setup-input"
+           placeholder="닉네임을 입력하세요" maxlength="20"
+           aria-describedby="setup-error" />
+    <div id="setup-error" role="alert" aria-live="assertive"></div>
+    <button id="create-btn" type="button" class="btn btn-primary">프로필 만들기</button>
+  </div>
+</div>
+
+<!-- ── 메인 화면 ── -->
+<div id="main-screen">
+  <nav class="main-nav" aria-label="서비스 내비게이션">
+    <span class="nav-logo">🍽️ 냉장고 레시피</span>
+    <div class="nav-links">
+      <a href="/">재료 인식</a>
+      <a href="/step2.html">레시피 생성</a>
+      <a href="/profile.html" class="active" aria-current="page">내 프로필</a>
+    </div>
+  </nav>
+
+  <!-- 프로필 헤더 -->
+  <div class="profile-header" role="banner">
+    <div class="avatar-display" id="header-avatar" aria-hidden="true"></div>
+    <div class="profile-info">
+      <h2 id="header-nickname"></h2>
+      <div class="meta" id="header-meta"></div>
+      <div id="edit-row" role="group" aria-label="닉네임 편집">
+        <label for="edit-nickname" class="sr-only">새 닉네임</label>
+        <input id="edit-nickname" type="text" placeholder="새 닉네임" maxlength="20" />
+        <button class="btn btn-green btn-sm" id="save-edit-btn" type="button">저장</button>
+        <button class="btn btn-gray btn-sm" id="cancel-edit-btn" type="button">취소</button>
+      </div>
+    </div>
+    <div class="profile-actions">
+      <button class="btn btn-gray btn-sm" id="edit-profile-btn" type="button">닉네임 수정</button>
+    </div>
+  </div>
+
+  <!-- 레시피 목록 -->
+  <main class="content">
+    <div class="section-title">
+      저장된 레시피
+      <span class="count-chip" id="recipe-count-chip" aria-live="polite">0개</span>
+    </div>
+    <div id="recipe-grid" class="recipe-grid" role="list" aria-label="저장된 레시피 목록"></div>
+  </main>
+</div>
+
+<!-- ── 레시피 상세 모달 ── -->
+<div class="modal-overlay" id="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-name">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modal-name"></h2>
+      <button class="modal-close" id="modal-close" type="button" aria-label="모달 닫기">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <path d="M4 4l12 12M16 4L4 16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-meta" id="modal-meta"></div>
+    <div class="section-label">재료</div>
+    <div class="ing-list" id="modal-ings"></div>
+    <div class="section-label">조리 순서</div>
+    <ol class="step-list" id="modal-steps"></ol>
+    <div id="modal-tip"></div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" id="modal-reuse-btn" type="button">이 재료로 새 레시피 만들기</button>
+      <button class="btn btn-gray" id="modal-close-btn" type="button">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── 삭제 확인 다이얼로그 (취소 먼저, aria-describedby 추가) ── -->
+<div id="confirm-overlay" role="alertdialog" aria-modal="true"
+     aria-labelledby="confirm-title" aria-describedby="confirm-desc">
+  <div class="confirm-box">
+    <div class="icon" aria-hidden="true">🗑️</div>
+    <h3 id="confirm-title">레시피를 삭제할까요?</h3>
+    <p id="confirm-desc">삭제한 레시피는 복구할 수 없어요.</p>
+    <div class="confirm-actions">
+      <!-- 취소(안전 행동)를 왼쪽(첫 번째)에 배치 -->
+      <button class="btn btn-gray" id="confirm-no" type="button">취소</button>
+      <button class="btn btn-danger" id="confirm-yes" type="button">삭제</button>
+    </div>
+  </div>
+</div>
+
+<!-- 스크린리더 알림 -->
+<div id="sr-announce" role="status" aria-live="polite" aria-atomic="true" class="sr-only"></div>
+
+<!-- 토스트 -->
+<div id="toast-container" aria-live="assertive" aria-atomic="true"></div>
+
+<script>
+  // ── 토스트 (텍스트 전용 — XSS 방지) ──────────────────────────
+  function showToast(message, type = 'error', duration = 4000) {
+    const container = document.getElementById('toast-container');
+    while (container.children.length >= 3) container.firstChild.remove();
+    const toast = document.createElement('div');
+    const icons = { error: '!', success: '✓', info: 'i' };
+    toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
+    toast.className = `toast toast-${type}`;
+
+    const icon = document.createElement('span');
+    icon.className = 'toast-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.textContent = icons[type] || '!';
+
+    const text = document.createElement('span');
+    text.textContent = message;
+
+    const closeBtn = document.createElement('button');
+    closeBtn.setAttribute('aria-label', '알림 닫기');
+    closeBtn.className = 'toast-close';
+    closeBtn.style.color = 'inherit';
+    closeBtn.textContent = '×';
+
+    toast.appendChild(icon);
+    toast.appendChild(text);
+    toast.appendChild(closeBtn);
+    container.appendChild(toast);
+
+    const timer = setTimeout(() => toast.remove(), duration);
+    closeBtn.addEventListener('click', () => { clearTimeout(timer); toast.remove(); });
+  }
+
+  // ── 상태 ─────────────────────────────────────────────────────
+  let selectedAvatar = '🍳';
+  let profileId = localStorage.getItem('profileId');
+  let currentProfile = null;
+  let recipes = [];
+  let activeRecipe = null;
+  let pendingDeleteId = null;
+
+  // ── 아바타 선택 ──────────────────────────────────────────────
+  document.getElementById('avatar-grid').addEventListener('click', e => {
+    const opt = e.target.closest('.avatar-opt');
+    if (!opt) return;
+    document.querySelectorAll('.avatar-opt').forEach(o => {
+      o.classList.remove('selected');
+      o.setAttribute('aria-pressed', 'false');
+    });
+    opt.classList.add('selected');
+    opt.setAttribute('aria-pressed', 'true');
+    selectedAvatar = opt.dataset.emoji;
+  });
+
+  // ── 초기화 ───────────────────────────────────────────────────
+  if (profileId) {
+    loadProfile(profileId);
+  } else {
+    showSetup();
+  }
+
+  function showSetup() {
+    document.getElementById('setup-screen').style.display = 'flex';
+    document.getElementById('main-screen').style.display = 'none';
+    setTimeout(() => document.getElementById('nickname-input').focus(), 100);
+  }
+
+  function showMain() {
+    document.getElementById('setup-screen').style.display = 'none';
+    document.getElementById('main-screen').style.display = 'block';
+  }
+
+  // ── 프로필 생성 ──────────────────────────────────────────────
+  document.getElementById('create-btn').addEventListener('click', createProfile);
+  document.getElementById('nickname-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') createProfile();
+  });
+
+  async function createProfile() {
+    const nickname = document.getElementById('nickname-input').value.trim();
+    const errorEl = document.getElementById('setup-error');
+    if (!nickname) { errorEl.textContent = '닉네임을 입력해주세요.'; return; }
+    errorEl.textContent = '';
+
+    const btn = document.getElementById('create-btn');
+    btn.disabled = true;
+    btn.textContent = '생성 중...';
+
+    try {
+      const res = await fetch('/api/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nickname, avatar: selectedAvatar }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '프로필 생성에 실패했습니다.');
+      profileId = data.id;
+      localStorage.setItem('profileId', profileId);
+      await loadProfile(profileId);
+    } catch (err) {
+      errorEl.textContent = err.message;
+      btn.disabled = false;
+      btn.textContent = '프로필 만들기';
+    }
+  }
+
+  // ── 프로필 로드 ──────────────────────────────────────────────
+  async function loadProfile(id) {
+    try {
+      const [profileRes, recipesRes] = await Promise.all([
+        fetch(`/api/profile/${id}`),
+        fetch(`/api/profile/${id}/recipes`),
+      ]);
+      if (!profileRes.ok) {
+        localStorage.removeItem('profileId');
+        profileId = null;
+        showSetup();
+        return;
+      }
+      currentProfile = await profileRes.json();
+      const recipesData = await recipesRes.json();
+      recipes = recipesData.recipes || [];
+      renderHeader();
+      renderRecipes();
+      showMain();
+    } catch (err) {
+      console.error(err);
+      showSetup();
+    }
+  }
+
+  // ── 헤더 렌더 ────────────────────────────────────────────────
+  function renderHeader() {
+    document.getElementById('header-avatar').textContent = currentProfile.avatar;
+    document.getElementById('header-nickname').textContent = currentProfile.nickname;
+    document.getElementById('header-meta').textContent =
+      `저장된 레시피 ${recipes.length}개 · 가입일 ${formatDate(currentProfile.created_at)}`;
+    document.getElementById('recipe-count-chip').textContent = `${recipes.length}개`;
+  }
+
+  // ── 프로필 편집 ──────────────────────────────────────────────
+  document.getElementById('edit-profile-btn').addEventListener('click', () => {
+    const row = document.getElementById('edit-row');
+    row.style.display = 'flex';
+    const input = document.getElementById('edit-nickname');
+    input.value = currentProfile.nickname;
+    input.focus();
+  });
+  document.getElementById('cancel-edit-btn').addEventListener('click', () => {
+    document.getElementById('edit-row').style.display = 'none';
+  });
+  document.getElementById('save-edit-btn').addEventListener('click', saveEdit);
+  document.getElementById('edit-nickname').addEventListener('keydown', e => {
+    if (e.key === 'Enter') saveEdit();
+    if (e.key === 'Escape') document.getElementById('edit-row').style.display = 'none';
+  });
+
+  // saveEdit — try/catch 추가 (Major 버그 수정)
+  async function saveEdit() {
+    const nickname = document.getElementById('edit-nickname').value.trim();
+    if (!nickname) return;
+    const saveBtn = document.getElementById('save-edit-btn');
+    saveBtn.disabled = true;
+    try {
+      const res = await fetch(`/api/profile/${profileId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nickname }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '닉네임 변경에 실패했습니다.');
+      currentProfile = { ...currentProfile, ...data };
+      document.getElementById('edit-row').style.display = 'none';
+      renderHeader();
+      showToast('닉네임이 변경됐어요!', 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      saveBtn.disabled = false;
+    }
+  }
+
+  // ── 레시피 렌더 (DOM API — XSS 방지) ────────────────────────
+  function renderRecipes() {
+    const grid = document.getElementById('recipe-grid');
+    grid.innerHTML = '';
+
+    if (recipes.length === 0) {
+      const emptyDiv = document.createElement('div');
+      emptyDiv.className = 'empty-state';
+
+      const iconDiv = document.createElement('div');
+      iconDiv.className = 'icon';
+      iconDiv.textContent = '📭';
+
+      const p = document.createElement('p');
+      p.textContent = '아직 저장된 레시피가 없어요. 냉장고 사진을 찍어 레시피를 만들어보세요!';
+
+      const link = document.createElement('a');
+      link.href = '/';
+      link.className = 'btn btn-primary';
+      link.style.textDecoration = 'none';
+      link.style.display = 'inline-flex';
+      link.textContent = '재료 인식하러 가기';
+
+      emptyDiv.appendChild(iconDiv);
+      emptyDiv.appendChild(p);
+      emptyDiv.appendChild(link);
+      grid.appendChild(emptyDiv);
+      return;
+    }
+
+    recipes.forEach(r => {
+      const card = document.createElement('article');
+      card.setAttribute('role', 'listitem');
+      card.className = 'recipe-card';
+      card.setAttribute('aria-label', `${r.name} 레시피 카드`);
+
+      const badge = document.createElement('span');
+      badge.className = `card-badge ${diffClass(r.difficulty)}`;
+      badge.textContent = r.difficulty || '보통';
+
+      const name = document.createElement('div');
+      name.className = 'card-name';
+      name.textContent = r.name;
+
+      const summary = document.createElement('div');
+      summary.className = 'card-summary';
+      summary.textContent = r.summary || '';
+
+      const meta = document.createElement('div');
+      meta.className = 'card-meta';
+      const timeSpan = document.createElement('span');
+      timeSpan.textContent = `⏱ ${r.time_minutes}분`;
+      const dateSpan = document.createElement('span');
+      dateSpan.textContent = `📅 ${formatDate(r.saved_at)}`;
+      meta.appendChild(timeSpan);
+      meta.appendChild(dateSpan);
+
+      const actions = document.createElement('div');
+      actions.className = 'card-actions';
+
+      const detailBtn = document.createElement('button');
+      detailBtn.className = 'btn btn-primary btn-sm';
+      detailBtn.type = 'button';
+      detailBtn.textContent = '상세 보기';
+      detailBtn.addEventListener('click', e => { e.stopPropagation(); openModal(r); });
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'btn btn-danger btn-sm';
+      deleteBtn.type = 'button';
+      deleteBtn.setAttribute('aria-label', `${r.name} 삭제`);
+      deleteBtn.textContent = '삭제';
+      deleteBtn.addEventListener('click', e => { e.stopPropagation(); showDeleteConfirm(r.id, r.name); });
+
+      actions.appendChild(detailBtn);
+      actions.appendChild(deleteBtn);
+
+      card.appendChild(badge);
+      card.appendChild(name);
+      card.appendChild(summary);
+      card.appendChild(meta);
+      card.appendChild(actions);
+      grid.appendChild(card);
+    });
+  }
+
+  function diffClass(d) {
+    if (d === '쉬움') return 'badge-easy';
+    if (d === '어려움') return 'badge-hard';
+    return 'badge-medium';
+  }
+
+  // ── 삭제 확인 다이얼로그 ─────────────────────────────────────
+  function showDeleteConfirm(id, name) {
+    pendingDeleteId = id;
+    document.getElementById('confirm-title').textContent = `"${name}"을 삭제할까요?`;
+    const overlay = document.getElementById('confirm-overlay');
+    overlay.classList.add('open');
+    // 취소 버튼(첫 번째)에 포커스
+    requestAnimationFrame(() => document.getElementById('confirm-no').focus());
+
+    overlay._onKey = e => {
+      if (e.key === 'Escape') hideDeleteConfirm();
+      if (e.key !== 'Tab') return;
+      const focusables = [...overlay.querySelectorAll('button')];
+      const first = focusables[0], last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+    document.addEventListener('keydown', overlay._onKey);
+    document.body.style.overflow = 'hidden';
+  }
+
+  function hideDeleteConfirm() {
+    const overlay = document.getElementById('confirm-overlay');
+    overlay.classList.remove('open');
+    document.removeEventListener('keydown', overlay._onKey);
+    document.body.style.overflow = '';
+    pendingDeleteId = null;
+  }
+
+  document.getElementById('confirm-no').addEventListener('click', hideDeleteConfirm);
+
+  // 삭제 핸들러 — try/catch 추가 (Major 버그 수정)
+  document.getElementById('confirm-yes').addEventListener('click', async () => {
+    if (!pendingDeleteId) return;
+    const id = pendingDeleteId;
+    hideDeleteConfirm();
+    try {
+      const res = await fetch(`/api/profile/${profileId}/recipes/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || '삭제에 실패했어요.');
+      }
+      recipes = recipes.filter(r => r.id !== id);
+      renderHeader();
+      renderRecipes();
+      showToast('레시피가 삭제됐어요.', 'info');
+      document.getElementById('sr-announce').textContent = '레시피가 삭제됐습니다.';
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  });
+
+  // ── 모달 (DOM API — XSS 방지) ────────────────────────────────
+  function openModal(recipe) {
+    activeRecipe = recipe;
+    document.getElementById('modal-name').textContent = recipe.name;
+
+    const metaEl = document.getElementById('modal-meta');
+    metaEl.innerHTML = '';
+    const timeSpan = document.createElement('span');
+    timeSpan.textContent = `⏱ ${recipe.time_minutes}분`;
+    const diffBadge = document.createElement('span');
+    diffBadge.className = `card-badge ${diffClass(recipe.difficulty)}`;
+    diffBadge.style.margin = '0';
+    diffBadge.textContent = recipe.difficulty || '보통';
+    metaEl.appendChild(timeSpan);
+    metaEl.appendChild(diffBadge);
+
+    const ingsEl = document.getElementById('modal-ings');
+    ingsEl.innerHTML = '';
+    (recipe.ingredients || []).forEach(i => {
+      const chip = document.createElement('span');
+      chip.className = 'ing-chip';
+      chip.textContent = i.name;
+      if (i.amount) {
+        const amt = document.createElement('span');
+        amt.style.color = '#9ca3af';
+        amt.textContent = ` ${i.amount}`;
+        chip.appendChild(amt);
+      }
+      ingsEl.appendChild(chip);
+    });
+
+    const stepsEl = document.getElementById('modal-steps');
+    stepsEl.innerHTML = '';
+    (recipe.steps || []).forEach((s, idx) => {
+      const li = document.createElement('li');
+      const numSpan = document.createElement('span');
+      numSpan.className = 'step-num';
+      numSpan.textContent = idx + 1;
+      const textSpan = document.createElement('span');
+      textSpan.textContent = s;
+      li.appendChild(numSpan);
+      li.appendChild(textSpan);
+      stepsEl.appendChild(li);
+    });
+
+    const tipEl = document.getElementById('modal-tip');
+    tipEl.innerHTML = '';
+    if (recipe.tip) {
+      const tipBox = document.createElement('div');
+      tipBox.className = 'tip-box';
+      tipBox.textContent = `💡 ${recipe.tip}`;
+      tipEl.appendChild(tipBox);
+    }
+
+    const overlay = document.getElementById('modal-overlay');
+    overlay.classList.add('open');
+
+    requestAnimationFrame(() => {
+      const first = overlay.querySelector('button:not([disabled]), [href], input, [tabindex]:not([tabindex="-1"])');
+      if (first) first.focus();
+    });
+
+    overlay._onKey = e => {
+      if (e.key === 'Escape') { closeModal(); return; }
+      if (e.key !== 'Tab') return;
+      const focusables = [...overlay.querySelectorAll('button:not([disabled]), [href], input, [tabindex]:not([tabindex="-1"])')];
+      const first = focusables[0], last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+    document.addEventListener('keydown', overlay._onKey);
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeModal() {
+    const overlay = document.getElementById('modal-overlay');
+    overlay.classList.remove('open');
+    document.removeEventListener('keydown', overlay._onKey);
+    document.body.style.overflow = '';
+    activeRecipe = null;
+  }
+
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  document.getElementById('modal-close-btn').addEventListener('click', closeModal);
+  document.getElementById('modal-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('modal-overlay')) closeModal();
+  });
+
+  // ── 재료 재사용 (sessionStorage 사용) ────────────────────────
+  document.getElementById('modal-reuse-btn').addEventListener('click', () => {
+    if (!activeRecipe) return;
+    const ings = (activeRecipe.source_image_ingredients || []).length > 0
+      ? activeRecipe.source_image_ingredients
+      : (activeRecipe.ingredients || []).map(i => i.name);
+    sessionStorage.setItem('ingredients', JSON.stringify(ings));
+    window.location.href = '/step2.html';
+  });
+
+  // ── 유틸 ─────────────────────────────────────────────────────
+  function formatDate(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+  }
+</script>
+</body>
+</html>

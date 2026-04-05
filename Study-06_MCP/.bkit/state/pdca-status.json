@@ -1,0 +1,75 @@
+{
+  "version": "3.0",
+  "lastUpdated": "2026-03-28T15:10:43.399Z",
+  "activeFeatures": [
+    "shopping-list"
+  ],
+  "primaryFeature": "shopping-list",
+  "features": {
+    "shopping-list": {
+      "phase": "do",
+      "phaseNumber": 3,
+      "matchRate": null,
+      "iterationCount": 0,
+      "requirements": [],
+      "documents": {},
+      "timestamps": {
+        "started": "2026-03-28T15:09:34.244Z",
+        "lastUpdated": "2026-03-28T15:10:43.399Z"
+      },
+      "lastFile": "C:/Users/hylee/Vibe_Coding/Study-06_MCP/shopping-list/shopping.test.js"
+    }
+  },
+  "pipeline": {
+    "currentPhase": 1,
+    "level": "Dynamic",
+    "phaseHistory": []
+  },
+  "session": {
+    "startedAt": "2026-03-28T12:29:54.365Z",
+    "onboardingCompleted": false,
+    "lastActivity": "2026-03-28T15:10:43.399Z"
+  },
+  "history": [
+    {
+      "timestamp": "2026-03-28T15:09:34.244Z",
+      "feature": "shopping-list",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-28T15:09:40.402Z",
+      "feature": "shopping-list",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-28T15:10:39.326Z",
+      "feature": "shopping-list",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-28T15:10:43.399Z",
+      "feature": "shopping-list",
+      "phase": "do",
+      "action": "updated"
+    }
+  ],
+  "stateMachine": {
+    "defaultWorkflow": "default",
+    "activeWorkflows": {},
+    "totalTransitions": 0
+  },
+  "automation": {
+    "globalLevel": 2,
+    "trustScore": 40,
+    "pendingApprovals": 0,
+    "lastGateResult": null
+  },
+  "team": {
+    "enabled": true,
+    "stateFile": ".bkit/runtime/agent-state.json",
+    "eventsFile": ".bkit/runtime/agent-events.jsonl"
+  }
+}

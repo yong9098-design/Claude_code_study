@@ -1,0 +1,1285 @@
+================================================================================
+  📋 현용의 할일 관리 앱 — todo_3.html 소스코드 (한글 주석 포함)
+  버전: v3 | 카테고리: 업무 / 개인 / 공부 / 원우회
+  주요 기능: localStorage 영속성, 드래그앤드롭 순서변경, 자동 카테고리 분류,
+             완료일 관리, 인라인 수정, 진행률 대시보드, 날짜/요일 표시
+================================================================================
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>📋 현용의 할일 관리</title>
+
+  <style>
+
+    /* ====================================================================
+       [1] 전역 기본 스타일 리셋
+       모든 요소의 box-sizing을 border-box로 설정해 padding이 너비에 포함되게 함
+       margin, padding 초기값 제거
+    ==================================================================== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #F8F9FA;          /* 연한 회색 배경 */
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;  /* 시스템 기본 폰트 */
+      min-height: 100vh;            /* 화면 전체 높이 최소 확보 */
+      padding: 20px;
+    }
+
+    /* 콘텐츠 최대 너비 제한 + 가운데 정렬 */
+    .container {
+      max-width: 640px;
+      margin: 0 auto;
+    }
+
+    /* ====================================================================
+       [2] 헤더 스타일
+       - flexbox로 타이틀을 가운데 정렬
+       - position: relative → 날짜 표시(.#current-date)를 absolute로 우측 배치
+    ==================================================================== */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;           /* 자식 요소의 absolute 기준점 */
+      padding: 24px 0 16px;
+    }
+    header h1 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: #333;
+    }
+
+    /* 우측 상단 날짜/요일 표시 영역
+       absolute로 헤더 오른쪽 끝에 고정, 수직 중앙 정렬 */
+    #current-date {
+      position: absolute;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);  /* 수직 완전 중앙 정렬 */
+      text-align: right;
+      line-height: 1.35;
+    }
+    #current-date .date-num {
+      display: block;
+      font-size: 1rem;
+      font-weight: 700;
+      color: #4A90D9;               /* 파란색으로 날짜 강조 */
+    }
+    #current-date .date-day {
+      display: block;
+      font-size: 0.78rem;
+      color: #888;                  /* 회색으로 요일 보조 표시 */
+      font-weight: 500;
+    }
+
+    /* ====================================================================
+       [3] 진행률 대시보드 스타일
+       - 전체 완료율 바 + 카테고리별 미니 바
+    ==================================================================== */
+    #dashboard {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .progress-main {
+      margin-bottom: 16px;
+    }
+    .progress-label {
+      display: flex;
+      justify-content: space-between; /* 좌: 완료수/전체, 우: 기한초과 경고 */
+      font-size: 0.9rem;
+      color: #555;
+      margin-bottom: 8px;
+    }
+    /* 전체 진행률 바 외곽 (회색 배경) */
+    .progress-bar-wrap {
+      background: #E0E0E0;
+      border-radius: 8px;
+      height: 12px;
+      overflow: hidden;             /* 채워진 바가 둥근 모서리 밖으로 나오지 않게 */
+    }
+    /* 전체 진행률 바 채워지는 부분 (파란색 → 100%시 초록색) */
+    .progress-bar-fill {
+      height: 100%;
+      border-radius: 8px;
+      background: #4A90D9;          /* 기본: 파란색 */
+      transition: width 0.4s ease, background 0.3s ease;
+    }
+    .progress-bar-fill.complete { background: #4CAF50; }  /* 100% 달성 시 초록색 */
+
+    /* 100% 완료 시 축하 메시지 */
+    .congrats {
+      text-align: center;
+      color: #4CAF50;
+      font-weight: 600;
+      margin-top: 8px;
+      font-size: 0.95rem;
+    }
+
+    /* 카테고리별 미니 진행률 바 컨테이너 (flex-wrap으로 4개 줄바꿈 처리) */
+    .progress-categories {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;              /* 4개 카테고리 넘치면 줄바꿈 */
+    }
+    .cat-progress {
+      flex: 1;
+      min-width: 120px;             /* 최소 너비 유지 */
+      font-size: 0.8rem;
+    }
+    .cat-progress-label {
+      display: flex;
+      justify-content: space-between;
+      color: #666;
+      margin-bottom: 4px;
+    }
+    /* 미니 바 외곽 */
+    .mini-bar-wrap {
+      background: #E0E0E0;
+      border-radius: 4px;
+      height: 6px;
+      overflow: hidden;
+    }
+    /* 미니 바 채워지는 부분 — 카테고리별 색상 */
+    .mini-bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.4s ease;
+    }
+    .mini-bar-fill.work     { background: #2196F3; }  /* 업무: 파랑 */
+    .mini-bar-fill.personal { background: #4CAF50; }  /* 개인: 초록 */
+    .mini-bar-fill.study    { background: #FF9800; }  /* 공부: 주황 */
+    .mini-bar-fill.club     { background: #9C27B0; }  /* 원우회: 보라 */
+
+    /* 할일이 없을 때 대시보드 안내 문구 */
+    .empty-dashboard {
+      text-align: center;
+      color: #9E9E9E;
+      font-size: 0.95rem;
+    }
+
+    /* ====================================================================
+       [4] 카테고리 탭 스타일
+       - overflow-x: auto → 모바일에서 탭이 많아도 가로 스크롤 허용
+    ==================================================================== */
+    #category-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      overflow-x: auto;             /* 탭 개수 많을 때 가로 스크롤 */
+      padding-bottom: 4px;
+    }
+    #category-tabs button {
+      flex-shrink: 0;               /* 탭 버튼이 줄어들지 않게 고정 */
+      padding: 8px 16px;
+      border: 2px solid #E0E0E0;
+      border-radius: 20px;          /* 알약 형태 */
+      background: #fff;
+      cursor: pointer;
+      font-size: 0.9rem;
+      color: #555;
+      transition: all 0.2s;
+    }
+    /* 선택된 탭 스타일 */
+    #category-tabs button.active {
+      border-color: #4A90D9;
+      background: #4A90D9;
+      color: #fff;
+    }
+    /* 호버 시 (선택되지 않은 탭) */
+    #category-tabs button:hover:not(.active) {
+      border-color: #4A90D9;
+      color: #4A90D9;
+    }
+
+    /* ====================================================================
+       [5] 입력 영역 스타일
+       - flex-wrap: wrap → 완료일 입력이 두 번째 줄에 배치
+    ==================================================================== */
+    #input-area {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      padding: 16px;
+      margin-bottom: 16px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    #task-input {
+      flex: 1;                      /* 가능한 공간 최대 차지 */
+      min-width: 180px;
+      padding: 10px 14px;
+      border: 2px solid #E0E0E0;
+      border-radius: 8px;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    #task-input:focus { border-color: #4A90D9; }  /* 포커스 시 파란 테두리 */
+
+    #category-select {
+      padding: 10px 12px;
+      border: 2px solid #E0E0E0;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      outline: none;
+      cursor: pointer;
+      background: #fff;
+    }
+
+    /* 완료일 입력 영역 (두 번째 줄 전체 차지) */
+    .input-due-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      width: 100%;                  /* 전체 너비 사용 → 줄바꿈 */
+      margin-top: 2px;
+    }
+    .input-due-wrap label {
+      font-size: 0.85rem;
+      color: #666;
+      white-space: nowrap;
+    }
+    #due-date-input {
+      flex: 1;
+      padding: 8px 10px;
+      border: 2px solid #E0E0E0;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      outline: none;
+      cursor: pointer;
+      background: #fff;
+      color: #333;
+      transition: border-color 0.2s;
+    }
+    #due-date-input:focus { border-color: #4A90D9; }
+
+    /* 추가 버튼 */
+    #add-btn {
+      padding: 10px 20px;
+      background: #4A90D9;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    #add-btn:hover { background: #357ABD; }
+
+    /* 자동 카테고리 분류 힌트 텍스트 */
+    #auto-hint {
+      width: 100%;
+      font-size: 0.8rem;
+      color: #4A90D9;
+      min-height: 1.2em;
+      padding: 2px 4px;
+    }
+
+    /* ====================================================================
+       [6] 할일 목록 스타일
+       - 드래그앤드롭 관련 클래스 포함
+    ==================================================================== */
+    #task-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    /* 할일 카드 기본 스타일 */
+    .task-item {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+      padding: 10px 14px 10px 12px;
+      transition: opacity 0.3s ease, box-shadow 0.2s ease;
+      cursor: default;
+    }
+    /* 완료된 항목: 흐리게 표시 */
+    .task-item.completed { opacity: 0.6; }
+
+    /* 드래그 중인 카드: 반투명 + 그림자 강조 */
+    .task-item.dragging {
+      opacity: 0.35;
+      box-shadow: 0 6px 20px rgba(74,144,217,0.25);
+    }
+    /* 드롭 위치 표시: 위쪽에 파란 선 */
+    .task-item.drag-over-top {
+      border-top: 3px solid #4A90D9;
+    }
+    /* 드롭 위치 표시: 아래쪽에 파란 선 */
+    .task-item.drag-over-bottom {
+      border-bottom: 3px solid #4A90D9;
+    }
+
+    /* 드래그 핸들 아이콘 (⠿)
+       hover 시 파란색으로 변해 드래그 가능함을 알림 */
+    .drag-handle {
+      flex-shrink: 0;
+      color: #CFCFCF;               /* 기본: 연한 회색 */
+      font-size: 1.1rem;
+      cursor: grab;                 /* 잡을 수 있는 커서 */
+      padding: 0 4px 0 0;
+      user-select: none;            /* 텍스트 선택 방지 */
+      line-height: 1;
+      transition: color 0.2s;
+    }
+    .drag-handle:hover { color: #4A90D9; }    /* 호버: 파란색 */
+    .drag-handle:active { cursor: grabbing; } /* 드래그 중: 잡은 커서 */
+
+    /* 할일 카드 상단 행 (핸들 + 체크박스 + 텍스트 + 뱃지 + 삭제 버튼) */
+    .task-main-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .task-item input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+      flex-shrink: 0;               /* 체크박스 크기 고정 */
+    }
+
+    /* 할일 텍스트 (더블클릭으로 인라인 수정 가능) */
+    .task-text {
+      flex: 1;
+      font-size: 0.95rem;
+      color: #333;
+      cursor: pointer;              /* 더블클릭 안내용 포인터 커서 */
+      word-break: break-all;        /* 긴 텍스트 줄바꿈 */
+    }
+    /* 기한 초과 할일: 빨간색 굵은 텍스트 */
+    .task-text.overdue {
+      color: #E53935;
+      font-weight: 600;
+    }
+    /* 완료된 할일: 회색 + 취소선 */
+    .task-item.completed .task-text {
+      color: #9E9E9E;
+      text-decoration: line-through;
+    }
+
+    /* 인라인 수정 시 텍스트 대신 표시되는 input */
+    .edit-input {
+      flex: 1;
+      padding: 4px 8px;
+      border: 2px solid #4A90D9;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      outline: none;
+    }
+
+    /* 카테고리 배지 — 각 카테고리별 색상 */
+    .category-badge {
+      flex-shrink: 0;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #fff;
+    }
+    .category-badge.work     { background: #2196F3; }  /* 업무: 파랑 */
+    .category-badge.personal { background: #4CAF50; }  /* 개인: 초록 */
+    .category-badge.study    { background: #FF9800; }  /* 공부: 주황 */
+    .category-badge.club     { background: #9C27B0; }  /* 원우회: 보라 */
+
+    /* 개별 삭제 버튼 */
+    .btn-delete {
+      flex-shrink: 0;
+      background: #EF5350;
+      border: none;
+      border-radius: 6px;
+      color: #fff;
+      padding: 4px 8px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: background 0.2s;
+    }
+    .btn-delete:hover { background: #C62828; }
+
+    /* ====================================================================
+       [7] 완료일 행 스타일 (완료일 보기 토글 활성화 시 표시)
+       - 상태(overdue/today/future/done)에 따라 색상 다르게 표시
+    ==================================================================== */
+    .task-date-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid #F0F0F0;  /* 상단 구분선 */
+    }
+    .task-date-row label {
+      font-size: 0.78rem;
+      color: #888;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .task-date-input {
+      padding: 4px 8px;
+      border: 1.5px solid #E0E0E0;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      outline: none;
+      cursor: pointer;
+      background: #FAFAFA;
+      color: #555;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .task-date-input:hover,
+    .task-date-input:focus {
+      border-color: #4A90D9;
+      background: #fff;
+    }
+    /* 기한 초과: 빨간 계열 */
+    .task-date-input.date-overdue {
+      color: #E53935;
+      border-color: #FFCDD2;
+      background: #FFF5F5;
+    }
+    /* 오늘 마감: 주황 계열 */
+    .task-date-input.date-today {
+      color: #E65100;
+      border-color: #FFE0B2;
+      background: #FFF8F0;
+    }
+    /* 미래 마감: 초록 계열 */
+    .task-date-input.date-future {
+      color: #2E7D32;
+      border-color: #C8E6C9;
+      background: #F1F8E9;
+    }
+
+    /* 날짜 상태 텍스트 라벨 */
+    .date-status { font-size: 0.75rem; font-weight: 600; }
+    .date-status.overdue { color: #E53935; }
+    .date-status.today   { color: #E65100; }
+    .date-status.future  { color: #2E7D32; }
+    .date-status.done    { color: #9E9E9E; }
+
+    /* 완료일 삭제(✕) 버튼 */
+    .btn-clear-date {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 0.8rem;
+      color: #BDBDBD;
+      padding: 2px 4px;
+      border-radius: 4px;
+      line-height: 1;
+      transition: color 0.2s;
+    }
+    .btn-clear-date:hover { color: #EF5350; }
+
+    /* ====================================================================
+       [8] 완료일 보기/숨기기 토글 버튼
+       - .active 클래스 추가 시 파란색 활성화 스타일
+    ==================================================================== */
+    #date-toggle-bar {
+      display: flex;
+      justify-content: flex-end;   /* 오른쪽 정렬 */
+      margin-bottom: 8px;
+    }
+    #date-toggle-btn {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 6px 14px;
+      border: 2px solid #E0E0E0;
+      border-radius: 20px;
+      background: #fff;
+      color: #9E9E9E;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      user-select: none;
+    }
+    #date-toggle-btn:hover { border-color: #4A90D9; color: #4A90D9; }
+    #date-toggle-btn.active {
+      border-color: #4A90D9;
+      background: #4A90D9;
+      color: #fff;
+    }
+    #date-toggle-btn .toggle-icon { font-size: 1rem; line-height: 1; }
+
+    /* 할일 없을 때 빈 상태 메시지 */
+    .empty-state {
+      text-align: center;
+      padding: 32px;
+      color: #9E9E9E;
+      font-size: 1rem;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+    }
+
+    /* ====================================================================
+       [9] 하단 푸터 — 완료 항목 일괄 삭제 버튼
+    ==================================================================== */
+    footer { text-align: center; padding-bottom: 24px; }
+    #clear-btn {
+      padding: 10px 24px;
+      background: #EF5350;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    #clear-btn:hover:not(:disabled) { background: #C62828; }
+    /* 완료 항목이 없을 때 비활성화 스타일 */
+    #clear-btn:disabled {
+      background: #E0E0E0;
+      color: #9E9E9E;
+      cursor: not-allowed;
+    }
+
+    /* ====================================================================
+       [10] 반응형 — 모바일(480px 이하)
+    ==================================================================== */
+    @media (max-width: 480px) {
+      body { padding: 10px; }
+      header h1 { font-size: 1.4rem; }
+      #input-area { flex-direction: column; }  /* 입력 영역 세로 배치 */
+      #task-input { min-width: unset; }
+      .progress-categories { flex-direction: column; gap: 8px; }  /* 카테고리 바 세로 배치 */
+    }
+
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ================================================================
+         헤더: 앱 타이틀 + 우측 날짜/요일 표시
+         date-num, date-day는 JS의 updateCurrentDate()에서 채워짐
+    ================================================================ -->
+    <header>
+      <h1>📋 현용의 할일 관리</h1>
+      <div id="current-date">
+        <span class="date-num"></span>   <!-- 예: 3월 16일 -->
+        <span class="date-day"></span>   <!-- 예: 월요일 -->
+      </div>
+    </header>
+
+    <!-- 진행률 대시보드 — JS의 updateProgress()에서 동적으로 채워짐 -->
+    <section id="dashboard"></section>
+
+    <!-- 카테고리 필터 탭 (5개) — data-filter 값이 필터 기준 -->
+    <nav id="category-tabs">
+      <button data-filter="all" class="active">전체</button>
+      <button data-filter="work">🏢 업무</button>
+      <button data-filter="personal">🏠 개인</button>
+      <button data-filter="study">📚 공부</button>
+      <button data-filter="club">🤝 원우회</button>
+    </nav>
+
+    <!-- 할일 입력 영역 -->
+    <section id="input-area">
+      <!-- 할일 텍스트 입력 (최대 100자, 입력 중 자동 카테고리 감지) -->
+      <input type="text" id="task-input" maxlength="100" placeholder="할일을 입력하세요...">
+
+      <!-- 카테고리 선택 드롭다운 (자동분류 시 JS로 값 변경됨) -->
+      <select id="category-select">
+        <option value="work">🏢 업무</option>
+        <option value="personal">🏠 개인</option>
+        <option value="study">📚 공부</option>
+        <option value="club">🤝 원우회</option>
+      </select>
+
+      <!-- 추가 버튼 -->
+      <button id="add-btn">+ 추가</button>
+
+      <!-- 자동 카테고리 분류 힌트 (키워드 감지 시 표시) -->
+      <span id="auto-hint"></span>
+
+      <!-- 완료일 입력 (선택 사항, YYYY-MM-DD 형식) -->
+      <div class="input-due-wrap">
+        <label for="due-date-input">📅 완료일</label>
+        <input type="date" id="due-date-input">
+      </div>
+    </section>
+
+    <!-- 완료일 보기/숨기기 토글 버튼 바 -->
+    <div id="date-toggle-bar">
+      <button id="date-toggle-btn" title="완료일 표시/숨기기">
+        <span class="toggle-icon">📅</span> 완료일 보기
+      </button>
+    </div>
+
+    <!-- 할일 목록 — JS의 renderTasks()에서 동적으로 채워짐 -->
+    <ul id="task-list"></ul>
+
+    <!-- 완료 항목 일괄 삭제 버튼 (완료 항목 없으면 disabled) -->
+    <footer>
+      <button id="clear-btn">완료 항목 일괄 삭제</button>
+    </footer>
+
+  </div><!-- /.container -->
+
+  <script>
+
+    /* ====================================================================
+       [JS-1] 상수 정의
+       - STORAGE_KEY: localStorage 저장 키 (버전 관리용 v3)
+       - CAT_NAMES: 카테고리 코드 → 한글 이름 매핑
+       - CAT_ICONS: 카테고리 코드 → 이모지 아이콘 매핑
+    ==================================================================== */
+    const STORAGE_KEY = 'todoApp_v3_tasks';
+    const CAT_NAMES = { work: '업무', personal: '개인', study: '공부', club: '원우회' };
+    const CAT_ICONS = { work: '🏢', personal: '🏠', study: '📚', club: '🤝' };
+
+    /* ====================================================================
+       [JS-2] 키워드 기반 자동 카테고리 분류
+       - 할일 텍스트에 포함된 키워드를 스캔해 카테고리 자동 감지
+       - 각 카테고리 키워드 수를 점수로 계산해 최고 점수 카테고리 반환
+    ==================================================================== */
+    const CATEGORY_KEYWORDS = {
+      work: [
+        '회의','미팅','스탠드업','발표','보고','브리핑','컨퍼런스콜','화상회의',
+        '보고서','제안서','계획서','이메일','메일','문서','ppt','엑셀','스프레드시트',
+        '슬랙','slack','zoom','줌','지라','jira','노션','confluence',
+        '업무','출장','프로젝트','기획','마감','납기','일정','결재','승인','계약',
+        '고객','팀','부서','상사','동료','거래처','클라이언트','파트너',
+        '배포','릴리즈','스프린트','칸반','온보딩','인터뷰','채용','코드리뷰',
+        'pr','풀리퀘','이슈','버그','핫픽스','인프라','서버','운영','모니터링',
+        '급여','연봉','인사','평가','kpi','okr','분기','연간'
+      ],
+      personal: [
+        '운동','헬스','요가','필라테스','수영','러닝','조깅','자전거','등산','산책',
+        '병원','치과','한의원','약','건강검진','다이어트','스트레칭','명상',
+        '청소','빨래','장보기','쇼핑','요리','설거지','분리수거','청구서',
+        '택배','이사','집수리','인테리어','가전','가구',
+        '친구','가족','부모님','연인','데이트','약속','모임','파티',
+        '영화','드라마','유튜브','게임','여행','캠핑','독서','취미',
+        '예약','보험','세금','환불','카드','통장','저축','용돈','생일','기념일',
+        '여권','비자','운전면허','주민등록','공과금'
+      ],
+      study: [
+        '공부','학습','복습','예습','암기','정리','노트','필기','요약',
+        '시험','퀴즈','과제','레포트','논문','발표준비',
+        '영어','토익','토플','오픽','일본어','중국어','스페인어',
+        '수학','통계','미적분','선형대수',
+        '코딩','프로그래밍','알고리즘','자료구조','파이썬','python',
+        'javascript','자바스크립트','java','자바','리액트','react',
+        'sql','데이터베이스','머신러닝','딥러닝','ai','인공지능',
+        '강의','수업','강좌','튜토리얼','인강','유데미','udemy','책','독서',
+        '자격증','정보처리기사','컴활','어학','단어','문법','문제풀기'
+      ],
+      club: [
+        '원우회','동문','동창','동기','선배','후배','동문회','총동창회',
+        '모임','정기모임','총회','정기총회','임원회','간사','총무','회장','부회장',
+        '회비','회비납부','찬조','기부','후원','회원','명부','연락망',
+        '행사','이벤트','봉사','봉사활동','체육대회','골프','산악회','등산모임',
+        '소식지','뉴스레터','동문소식','홈커밍','축하','기념','송년','신년'
+      ]
+    };
+
+    /**
+     * 텍스트에서 카테고리 자동 감지
+     * @param {string} text - 할일 입력 텍스트
+     * @returns {string|null} 감지된 카테고리 코드 또는 null
+     */
+    function detectCategory(text) {
+      const lower = text.toLowerCase();
+      const scores = { work: 0, personal: 0, study: 0, club: 0 };  // 카테고리별 점수 초기화
+      for (const [cat, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
+        for (const kw of keywords) {
+          if (lower.includes(kw)) scores[cat]++;  // 키워드 포함 시 점수 +1
+        }
+      }
+      const best = Object.entries(scores).sort((a, b) => b[1] - a[1])[0];
+      return best[1] > 0 ? best[0] : null;  // 최고 점수가 0이면 감지 불가 → null
+    }
+
+    /* ====================================================================
+       [JS-3] 전역 상태 변수
+    ==================================================================== */
+    let tasks = loadFromStorage();   // 앱 시작 시 localStorage에서 불러옴
+    let currentFilter = 'all';       // 현재 선택된 카테고리 필터
+    let showDueDates = false;        // 완료일 행 표시 여부 (토글)
+
+    /* ====================================================================
+       [JS-4] localStorage 입출력 함수
+    ==================================================================== */
+
+    /**
+     * localStorage에서 할일 배열 불러오기
+     * JSON 파싱 오류 발생 시 빈 배열 반환 (안전 처리)
+     */
+    function loadFromStorage() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+      } catch {
+        return [];  // 파싱 오류 시 초기화
+      }
+    }
+
+    /**
+     * 할일 배열을 localStorage에 저장
+     * @param {Array} arr - 저장할 tasks 배열
+     */
+    function saveToStorage(arr) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
+    }
+
+    /* ====================================================================
+       [JS-5] 날짜 유틸리티 함수
+    ==================================================================== */
+
+    /** 오늘 날짜를 "YYYY-MM-DD" 형식의 문자열로 반환 */
+    function todayStr() {
+      return new Date().toISOString().slice(0, 10);
+    }
+
+    /**
+     * 완료일 문자열과 완료 여부를 받아 상태 코드 반환
+     * @param {string|null} dateStr - "YYYY-MM-DD" 또는 null
+     * @param {boolean} completed - 할일 완료 여부
+     * @returns {'overdue'|'today'|'future'|'done'|null}
+     */
+    function dateStatus(dateStr, completed) {
+      if (!dateStr) return null;      // 완료일 없으면 상태 없음
+      if (completed) return 'done';   // 완료된 항목은 항상 'done'
+      const today = todayStr();
+      if (dateStr < today) return 'overdue';   // 오늘보다 이전 → 기한 초과
+      if (dateStr === today) return 'today';   // 오늘 마감
+      return 'future';                          // 아직 여유 있음
+    }
+
+    /**
+     * 상태 코드를 한글 라벨로 변환
+     * @param {string} status - dateStatus() 반환값
+     * @returns {string} 화면에 표시할 한글 텍스트
+     */
+    function dateStatusLabel(status) {
+      if (status === 'overdue') return '⚠ 기한 초과';
+      if (status === 'today')   return '오늘까지';
+      if (status === 'future')  return '예정';
+      if (status === 'done')    return '완료됨';
+      return '';
+    }
+
+    /* ====================================================================
+       [JS-6] 할일 CRUD (Create / Read / Update / Delete) 함수
+    ==================================================================== */
+
+    /**
+     * 새 할일 추가
+     * @param {string} text - 할일 내용 (trim 처리)
+     * @param {string} category - 카테고리 코드
+     * @param {string|null} dueDate - 완료일 "YYYY-MM-DD" 또는 빈 문자열
+     */
+    function addTask(text, category, dueDate) {
+      const trimmed = text.trim();
+      if (!trimmed) { alert('할일 내용을 입력해주세요.'); return; }  // 공백 방지
+
+      tasks.push({
+        id: Date.now().toString(),   // 타임스탬프로 고유 ID 생성
+        text: trimmed,
+        category,
+        completed: false,
+        createdAt: Date.now(),
+        dueDate: dueDate || null     // 빈 문자열은 null로 저장
+      });
+      saveToStorage(tasks);
+
+      // 입력 필드 초기화 + 포커스 유지
+      document.getElementById('task-input').value = '';
+      document.getElementById('due-date-input').value = '';
+      document.getElementById('task-input').focus();
+    }
+
+    /**
+     * 할일 삭제
+     * @param {string} id - 삭제할 Task의 id
+     */
+    function deleteTask(id) {
+      tasks = tasks.filter(t => t.id !== id);
+      saveToStorage(tasks);
+    }
+
+    /**
+     * 완료 상태 토글 (완료 ↔ 미완료)
+     * @param {string} id - 토글할 Task의 id
+     */
+    function toggleTask(id) {
+      tasks = tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t);
+      saveToStorage(tasks);
+    }
+
+    /**
+     * 할일 텍스트 수정 (인라인 수정에서 호출)
+     * @param {string} id - 수정할 Task의 id
+     * @param {string} newText - 새 텍스트 (trim 처리)
+     */
+    function editTask(id, newText) {
+      const trimmed = newText.trim();
+      if (!trimmed) return;          // 빈 텍스트면 저장 안 함
+      tasks = tasks.map(t => t.id === id ? { ...t, text: trimmed } : t);
+      saveToStorage(tasks);
+    }
+
+    /**
+     * 완료일 설정/삭제
+     * @param {string} id - 대상 Task의 id
+     * @param {string|null} dateStr - "YYYY-MM-DD" 또는 null
+     */
+    function setDueDate(id, dateStr) {
+      tasks = tasks.map(t => t.id === id ? { ...t, dueDate: dateStr || null } : t);
+      saveToStorage(tasks);
+    }
+
+    /* ====================================================================
+       [JS-7] 완료일 토글 버튼 상태 동기화
+       showDueDates 변수에 따라 버튼 텍스트와 스타일 변경
+    ==================================================================== */
+    function updateDateToggleBtn() {
+      const btn = document.getElementById('date-toggle-btn');
+      if (showDueDates) {
+        btn.classList.add('active');
+        btn.innerHTML = '<span class="toggle-icon">📅</span> 완료일 숨기기';
+      } else {
+        btn.classList.remove('active');
+        btn.innerHTML = '<span class="toggle-icon">📅</span> 완료일 보기';
+      }
+    }
+
+    /* ====================================================================
+       [JS-8] 필터 함수
+    ==================================================================== */
+
+    /**
+     * 현재 카테고리 필터에 맞는 할일만 반환
+     * @returns {Array} 필터링된 tasks 배열
+     */
+    function getFilteredTasks() {
+      return currentFilter === 'all'
+        ? tasks
+        : tasks.filter(t => t.category === currentFilter);
+    }
+
+    /* ====================================================================
+       [JS-9] 진행률 대시보드 업데이트
+       - 전체 완료율 + 기한 초과 카운트
+       - 카테고리별 미니 진행 바 (work / personal / study / club)
+       - 100% 달성 시 축하 메시지 + 초록 바
+    ==================================================================== */
+    function updateProgress() {
+      const dash = document.getElementById('dashboard');
+
+      // 할일이 하나도 없을 때
+      if (tasks.length === 0) {
+        dash.innerHTML = '<p class="empty-dashboard">할일을 추가해서 오늘을 계획해보세요! ✨</p>';
+        return;
+      }
+
+      const total = tasks.length;
+      const done  = tasks.filter(t => t.completed).length;
+      const pct   = Math.round((done / total) * 100);       // 퍼센트 (반올림)
+      const isComplete = pct === 100;
+
+      // 기한 초과 건수 (미완료 & 완료일이 오늘보다 이전)
+      const overdueCount = tasks.filter(t => !t.completed && t.dueDate && t.dueDate < todayStr()).length;
+      const overdueHtml = overdueCount > 0
+        ? `<span style="color:#E53935;font-size:0.82rem;font-weight:600;">⚠ 기한 초과 ${overdueCount}건</span>`
+        : '';
+
+      // 카테고리별 미니 진행 바 HTML 생성
+      const catRows = ['work', 'personal', 'study', 'club'].map(cat => {
+        const catAll  = tasks.filter(t => t.category === cat);
+        const catDone = catAll.filter(t => t.completed).length;
+        const catPct  = catAll.length ? Math.round((catDone / catAll.length) * 100) : 0;
+        const label   = catAll.length ? `${catDone}/${catAll.length}` : '할일 없음';
+        return `
+          <div class="cat-progress">
+            <div class="cat-progress-label">
+              <span>${CAT_ICONS[cat]} ${CAT_NAMES[cat]}</span>
+              <span>${label}</span>
+            </div>
+            <div class="mini-bar-wrap">
+              <div class="mini-bar-fill ${cat}" style="width:${catPct}%"></div>
+            </div>
+          </div>`;
+      }).join('');
+
+      dash.innerHTML = `
+        <div class="progress-main">
+          <div class="progress-label">
+            <span>전체 ${done}/${total} (${pct}%)</span>
+            ${overdueHtml}
+          </div>
+          <div class="progress-bar-wrap">
+            <div class="progress-bar-fill ${isComplete ? 'complete' : ''}" style="width:${pct}%"></div>
+          </div>
+          ${isComplete ? '<p class="congrats">🎉 모든 할일을 완료했습니다!</p>' : ''}
+        </div>
+        <div class="progress-categories">${catRows}</div>`;
+    }
+
+    /* ====================================================================
+       [JS-10] 할일 목록 렌더링
+       - 탭 카운터 업데이트
+       - 빈 상태 메시지 처리
+       - 각 할일을 <li> 카드로 생성 (draggable 포함)
+       - 완료일 행 조건부 렌더링 (showDueDates 토글)
+    ==================================================================== */
+    function renderTasks() {
+      const list = document.getElementById('task-list');
+      const filtered = getFilteredTasks();
+
+      // ── 탭 카운터 업데이트 (미완료 개수 배지) ──────────
+      document.querySelectorAll('#category-tabs button').forEach(btn => {
+        const filter = btn.dataset.filter;
+        const pending = filter === 'all'
+          ? tasks.filter(t => !t.completed).length
+          : tasks.filter(t => t.category === filter && !t.completed).length;
+        const base = filter === 'all' ? '전체' : `${CAT_ICONS[filter]} ${CAT_NAMES[filter]}`;
+        btn.textContent = pending > 0 ? `${base} (${pending})` : base;
+      });
+
+      // ── 빈 상태 처리 ────────────────────────────────────
+      if (filtered.length === 0) {
+        const msg = currentFilter === 'all'
+          ? '할일이 없습니다 🎉'
+          : `${CAT_NAMES[currentFilter]} 카테고리에 할일이 없습니다.`;
+        list.innerHTML = `<li class="empty-state">${msg}</li>`;
+        updateProgress();
+        updateClearBtn();
+        return;
+      }
+
+      // ── 할일 카드 생성 ───────────────────────────────────
+      list.innerHTML = '';
+      filtered.forEach(task => {
+        const li = document.createElement('li');
+        li.className = `task-item${task.completed ? ' completed' : ''}`;
+        li.dataset.id = task.id;
+
+        // 완료일 상태 계산
+        const status      = dateStatus(task.dueDate, task.completed);
+        const statusLabel = dateStatusLabel(status);
+        const dateClass   = status ? `task-date-input date-${status}` : 'task-date-input';
+
+        li.draggable = true;  // 드래그 앤 드롭 활성화
+
+        li.innerHTML = `
+          <div class="task-main-row">
+            <!-- 드래그 핸들: 이 아이콘을 잡고 드래그 -->
+            <span class="drag-handle" title="드래그하여 순서 변경">⠿</span>
+            <!-- 완료 체크박스 -->
+            <input type="checkbox" ${task.completed ? 'checked' : ''}>
+            <!-- 할일 텍스트 (기한 초과 시 .overdue 클래스로 빨간색) -->
+            <span class="task-text${status === 'overdue' ? ' overdue' : ''}">${escapeHtml(task.text)}</span>
+            <!-- 카테고리 배지 -->
+            <span class="category-badge ${task.category}">${CAT_NAMES[task.category]}</span>
+            <!-- 개별 삭제 버튼 -->
+            <button class="btn-delete">🗑</button>
+          </div>
+          ${showDueDates ? `
+          <div class="task-date-row">
+            <label>📅 완료일</label>
+            <input
+              type="date"
+              class="${dateClass}"
+              value="${task.dueDate || ''}"
+              data-role="due-date">
+            ${task.dueDate ? `<button class="btn-clear-date" data-role="clear-date" title="완료일 삭제">✕</button>` : ''}
+            ${statusLabel ? `<span class="date-status ${status}">${statusLabel}</span>` : ''}
+          </div>` : ''}`;
+
+        list.appendChild(li);
+      });
+
+      updateProgress();   // 진행률 대시보드 갱신
+      updateClearBtn();   // 일괄 삭제 버튼 상태 갱신
+    }
+
+    /** 완료 항목 없으면 일괄 삭제 버튼 비활성화 */
+    function updateClearBtn() {
+      const btn = document.getElementById('clear-btn');
+      btn.disabled = !tasks.some(t => t.completed);
+    }
+
+    /**
+     * XSS 방지용 HTML 이스케이프
+     * 사용자 입력 텍스트를 innerHTML에 삽입하기 전 반드시 호출
+     */
+    function escapeHtml(str) {
+      return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    /* ====================================================================
+       [JS-11] 인라인 수정 기능
+       - .task-text 더블클릭 시 <span> → <input> 전환
+       - Enter / blur: 저장 | Esc: 취소
+       - saved 플래그로 Enter + blur 이벤트 중복 실행 방지
+    ==================================================================== */
+    function startEdit(li, id, currentText) {
+      if (li.classList.contains('completed')) return;  // 완료 항목 수정 불가
+
+      const span = li.querySelector('.task-text');
+      const input = document.createElement('input');
+      input.className = 'edit-input';
+      input.value = currentText;
+      input.maxLength = 100;
+      span.replaceWith(input);  // span을 input으로 교체
+      input.focus();
+      input.select();           // 전체 텍스트 선택
+
+      let saved = false;        // 중복 저장 방지 플래그
+
+      function save() {
+        if (saved) return;
+        saved = true;
+        editTask(id, input.value);
+        renderTasks();
+      }
+
+      function cancel() {
+        if (saved) return;
+        saved = true;
+        renderTasks();          // 저장 없이 원래 상태로 복원
+      }
+
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); save(); }
+        if (e.key === 'Escape') cancel();
+      });
+      input.addEventListener('blur', save);  // 포커스 벗어나면 자동 저장
+    }
+
+    /* ====================================================================
+       [JS-12] 이벤트 리스너 등록
+    ==================================================================== */
+
+    // 추가 버튼 클릭
+    document.getElementById('add-btn').addEventListener('click', () => {
+      const text    = document.getElementById('task-input').value;
+      const cat     = document.getElementById('category-select').value;
+      const dueDate = document.getElementById('due-date-input').value;
+      addTask(text, cat, dueDate);
+      renderTasks();
+    });
+
+    // 입력창 Enter 키 → 추가 버튼 클릭과 동일 동작
+    document.getElementById('task-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('add-btn').click();
+    });
+
+    // 실시간 자동 카테고리 감지 (input 이벤트)
+    document.getElementById('task-input').addEventListener('input', e => {
+      const hint     = document.getElementById('auto-hint');
+      const detected = detectCategory(e.target.value);
+      if (detected) {
+        document.getElementById('category-select').value = detected;  // 드롭다운 자동 변경
+        hint.textContent = `✨ 자동 분류: ${CAT_ICONS[detected]} ${CAT_NAMES[detected]}`;
+      } else {
+        hint.textContent = '';
+      }
+    });
+
+    // 이벤트 위임: #task-list 클릭 이벤트 (체크박스 / 삭제 / 완료일 삭제)
+    document.getElementById('task-list').addEventListener('click', e => {
+      const li = e.target.closest('[data-id]');  // 클릭된 요소의 가장 가까운 [data-id] 조상
+      if (!li) return;
+      const id = li.dataset.id;
+
+      if (e.target.type === 'checkbox') {
+        toggleTask(id);   // 완료 상태 토글
+        renderTasks();
+      } else if (e.target.classList.contains('btn-delete')) {
+        deleteTask(id);   // 개별 삭제
+        renderTasks();
+      } else if (e.target.dataset.role === 'clear-date') {
+        setDueDate(id, null);  // 완료일 삭제
+        renderTasks();
+      }
+    });
+
+    // 완료일 날짜 변경 (change 이벤트 위임)
+    document.getElementById('task-list').addEventListener('change', e => {
+      if (e.target.dataset.role !== 'due-date') return;
+      const li = e.target.closest('[data-id]');
+      if (!li) return;
+      setDueDate(li.dataset.id, e.target.value || null);
+      renderTasks();
+    });
+
+    // 더블클릭 텍스트 수정 (이벤트 위임)
+    document.getElementById('task-list').addEventListener('dblclick', e => {
+      const span = e.target.closest('.task-text');
+      if (!span) return;
+      const li = span.closest('[data-id]');
+      if (!li) return;
+      startEdit(li, li.dataset.id, span.textContent);
+    });
+
+    // 카테고리 탭 클릭 → 필터 변경 + 렌더링
+    document.getElementById('category-tabs').addEventListener('click', e => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      currentFilter = btn.dataset.filter;
+      document.querySelectorAll('#category-tabs button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderTasks();
+    });
+
+    // 완료일 보기/숨기기 토글
+    document.getElementById('date-toggle-btn').addEventListener('click', () => {
+      showDueDates = !showDueDates;
+      updateDateToggleBtn();
+      renderTasks();
+    });
+
+    // 완료 항목 일괄 삭제
+    document.getElementById('clear-btn').addEventListener('click', () => {
+      tasks = tasks.filter(t => !t.completed);
+      saveToStorage(tasks);
+      renderTasks();
+    });
+
+    /* ====================================================================
+       [JS-13] 헤더 날짜/요일 실시간 표시
+       - updateCurrentDate(): #current-date 영역에 "N월 N일 / X요일" 표시
+       - setInterval로 1분마다 자동 갱신
+    ==================================================================== */
+    const DAY_NAMES = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
+
+    function updateCurrentDate() {
+      const now   = new Date();
+      const month = now.getMonth() + 1;
+      const date  = now.getDate();
+      const day   = DAY_NAMES[now.getDay()];
+      document.querySelector('#current-date .date-num').textContent = `${month}월 ${date}일`;
+      document.querySelector('#current-date .date-day').textContent = day;
+    }
+
+    /* ====================================================================
+       [JS-14] 드래그 앤 드롭으로 할일 순서 변경
+       - dragstart: 드래그 시작한 아이템 ID 저장, .dragging 클래스 추가
+       - dragend: 모든 드래그 관련 클래스 제거, dragSrcId 초기화
+       - dragover: 마우스 위치(상반/하반부)에 따라 삽입 위치 표시선 토글
+       - dragleave: 표시선 제거
+       - drop: tasks 배열에서 순서 변경 후 저장 및 렌더링
+    ==================================================================== */
+    let dragSrcId = null;  // 현재 드래그 중인 아이템의 ID
+
+    function initDragDrop() {
+      const list = document.getElementById('task-list');
+
+      // 드래그 시작
+      list.addEventListener('dragstart', e => {
+        const li = e.target.closest('.task-item');
+        if (!li) return;
+        dragSrcId = li.dataset.id;
+        setTimeout(() => li.classList.add('dragging'), 0);  // 렌더링 후 적용 (비동기)
+        e.dataTransfer.effectAllowed = 'move';
+      });
+
+      // 드래그 종료 — 모든 상태 클래스 정리
+      list.addEventListener('dragend', () => {
+        document.querySelectorAll('.task-item').forEach(item => {
+          item.classList.remove('dragging', 'drag-over-top', 'drag-over-bottom');
+        });
+        dragSrcId = null;
+      });
+
+      // 드래그 오버 — 삽입 위치 표시선 갱신
+      list.addEventListener('dragover', e => {
+        e.preventDefault();  // 기본 드래그 금지 해제
+        e.dataTransfer.dropEffect = 'move';
+        const li = e.target.closest('.task-item');
+        if (!li || li.dataset.id === dragSrcId) return;  // 자기 자신 위에서는 무시
+
+        // 이전 표시선 모두 제거
+        document.querySelectorAll('.task-item').forEach(item => {
+          item.classList.remove('drag-over-top', 'drag-over-bottom');
+        });
+
+        // 마우스가 아이템의 상반부 → 위쪽에 선, 하반부 → 아래쪽에 선
+        const rect = li.getBoundingClientRect();
+        if (e.clientY < rect.top + rect.height / 2) {
+          li.classList.add('drag-over-top');
+        } else {
+          li.classList.add('drag-over-bottom');
+        }
+      });
+
+      // 드래그 떠남 — 표시선 제거
+      list.addEventListener('dragleave', e => {
+        const li = e.target.closest('.task-item');
+        if (li) li.classList.remove('drag-over-top', 'drag-over-bottom');
+      });
+
+      // 드롭 — tasks 배열 순서 변경
+      list.addEventListener('drop', e => {
+        e.preventDefault();
+        const targetLi = e.target.closest('.task-item');
+        if (!targetLi || !dragSrcId || targetLi.dataset.id === dragSrcId) return;
+
+        const targetId    = targetLi.dataset.id;
+        const rect        = targetLi.getBoundingClientRect();
+        const insertBefore = e.clientY < rect.top + rect.height / 2;  // 삽입 방향
+
+        // 1. 소스 아이템을 배열에서 제거
+        const srcIdx = tasks.findIndex(t => t.id === dragSrcId);
+        const [removed] = tasks.splice(srcIdx, 1);
+
+        // 2. 타겟 인덱스 재계산 (제거 후 인덱스 변동 반영)
+        const tgtIdx = tasks.findIndex(t => t.id === targetId);
+
+        // 3. 타겟 위/아래에 삽입
+        tasks.splice(insertBefore ? tgtIdx : tgtIdx + 1, 0, removed);
+
+        saveToStorage(tasks);
+        renderTasks();
+      });
+    }
+
+    /* ====================================================================
+       [JS-15] 앱 초기화 — DOMContentLoaded
+       HTML 파싱 완료 후 실행
+    ==================================================================== */
+    document.addEventListener('DOMContentLoaded', () => {
+      updateCurrentDate();                      // 날짜/요일 즉시 표시
+      setInterval(updateCurrentDate, 60000);    // 1분마다 날짜 갱신
+      initDragDrop();                           // 드래그앤드롭 이벤트 등록
+      renderTasks();                            // 저장된 할일 렌더링
+      document.getElementById('task-input').focus();  // 입력창 자동 포커스
+    });
+
+  </script>
+</body>
+</html>
+
+================================================================================
+  소스코드 끝
+  총 기능 목록:
+    1. 할일 추가 / 수정(더블클릭 인라인) / 삭제
+    2. 카테고리: 업무 / 개인 / 공부 / 원우회
+    3. 자동 카테고리 분류 (키워드 기반)
+    4. 완료 체크 + 일괄 삭제
+    5. 완료일 설정 / 기한 초과 시각화
+    6. 진행률 대시보드 (전체 + 카테고리별)
+    7. 카테고리 탭 필터 (미완료 카운터 배지)
+    8. 드래그 앤 드롭 순서 변경
+    9. 헤더 날짜/요일 실시간 표시
+   10. localStorage 영속성 (새로고침 후 데이터 유지)
+   11. 반응형 레이아웃 (모바일 480px 대응)
+================================================================================

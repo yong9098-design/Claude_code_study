@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_fill_form",
+      "mcp__playwright__browser_click",
+      "Bash(start \"\" \"C:\\\\Users\\\\hylee\\\\Vibe_Coding\\\\Study-06_MCP\\\\shopping-list\\\\index.html\")",
+      "mcp__playwright__browser_install",
+      "Bash(npx playwright:*)",
+      "Bash(npm init:*)"
+    ]
+  }
+}
